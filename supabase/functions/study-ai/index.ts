@@ -167,67 +167,56 @@ serve(async (req) => {
       });
     }
 
-    // Collect all available Gemini keys
-    const geminiKeys: string[] = [];
+    // Collect all available GitHub API keys (stored as GEMINI_API_KEY_1..10 from before, plus GITHUB_TOKEN)
+    const githubKeys: string[] = [];
     for (let i = 1; i <= 10; i++) {
-      const k = Deno.env.get(`GEMINI_API_KEY_${i}`);
-      if (k) geminiKeys.push(k);
+      const k = Deno.env.get(`GEMINI_API_KEY_${i}`) || Deno.env.get(`GITHUB_API_KEY_${i}`);
+      if (k) githubKeys.push(k);
     }
+    const singleGithub = Deno.env.get("GITHUB_TOKEN");
+    if (singleGithub && !githubKeys.includes(singleGithub)) githubKeys.push(singleGithub);
 
     // Shuffle for random order each request
-    const shuffled = [...geminiKeys].sort(() => Math.random() - 0.5);
+    const shuffled = [...githubKeys].sort(() => Math.random() - 0.5);
 
-    const geminiContents = toGeminiContents(messages, images);
+    // Build OpenAI-style messages (used for GitHub Models, OpenRouter & Lovable AI)
+    const aiMessages = buildOpenAIMessages(messages, images);
 
-    // Build OpenAI-style messages (used by OpenRouter & Lovable AI)
-    const aiMessages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
-    for (const msg of messages) {
-      if (msg.role === "user" && images && images.length > 0 && msg === messages[messages.length - 1]) {
-        const contentParts: any[] = [{ type: "text", text: msg.content }];
-        for (const img of images) {
-          contentParts.push({ type: "image_url", image_url: { url: img } });
-        }
-        aiMessages.push({ role: "user", content: contentParts });
-      } else {
-        aiMessages.push(msg);
-      }
-    }
-
-    // 1️⃣ FIRST: try Gemini API keys (works for both text and images)
+    // 1️⃣ FIRST: try GitHub Models API keys with gpt-4o (works for both text and images)
     for (const key of shuffled) {
       try {
-        const r = await callGemini(key, geminiContents);
+        const r = await callGitHubModels(key, aiMessages);
         if (r.ok && r.body) {
-          console.log(`✅ Gemini key #${geminiKeys.indexOf(key) + 1} succeeded`);
-          const sseStream = geminiStreamToOpenAISSE(r.body);
-          return new Response(sseStream, {
+          console.log(`✅ GitHub key #${githubKeys.indexOf(key) + 1} succeeded (gpt-4o)`);
+          return new Response(r.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
           });
         }
-        console.warn(`⚠️ Gemini key #${geminiKeys.indexOf(key) + 1} failed: ${r.status}`);
+        const errTxt = await r.text().catch(() => "");
+        console.warn(`⚠️ GitHub key #${githubKeys.indexOf(key) + 1} failed: ${r.status} ${errTxt.slice(0, 200)}`);
       } catch (e) {
-        console.warn(`⚠️ Gemini key #${geminiKeys.indexOf(key) + 1} threw:`, e);
+        console.warn(`⚠️ GitHub key #${githubKeys.indexOf(key) + 1} threw:`, e);
       }
     }
 
     const hasImages = Array.isArray(images) && images.length > 0;
 
-    // 2️⃣ FALLBACK (text-only): Gemma via OpenRouter
+    // 2️⃣ FALLBACK (text-only): OpenRouter
     if (!hasImages) {
       try {
         const orResp = await callOpenRouter(aiMessages);
         if (orResp && orResp.ok && orResp.body) {
-          console.log("✅ OpenRouter (Gemma) succeeded as fallback [text-only]");
+          console.log("✅ OpenRouter succeeded as fallback [text-only]");
           return new Response(orResp.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
           });
         }
-        if (orResp) console.warn(`⚠️ OpenRouter (Gemma) failed: ${orResp.status}`);
+        if (orResp) console.warn(`⚠️ OpenRouter failed: ${orResp.status}`);
       } catch (e) {
         console.warn("⚠️ OpenRouter threw:", e);
       }
     } else {
-      console.log("🖼️ Images detected → skipping Gemma fallback");
+      console.log("🖼️ Images detected → skipping OpenRouter fallback");
     }
 
     // 3️⃣ LAST RESORT: Lovable AI Gateway
