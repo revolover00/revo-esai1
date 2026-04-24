@@ -1,0 +1,2200 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useRef, useEffect } from 'react';
+import { 
+  Upload, 
+  BookOpen, 
+  Zap, 
+  Network, 
+  HelpCircle, 
+  MessageSquare,
+  Image as ImageIcon, 
+  Loader2, 
+  ChevronLeft,
+  RefreshCw,
+  Camera,
+  X,
+  Moon,
+  Sun,
+  FileText,
+  History,
+  Volume2,
+  VolumeX,
+  Youtube,
+  Video,
+  Link as LinkIcon,
+  Download,
+  Maximize2,
+  Minimize2
+} from 'lucide-react';
+import logoImage from '@/assets/logo.png';
+import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
+import { toPng } from 'html-to-image';
+import * as pdfjsLib from 'pdfjs-dist';
+import { LogIn, LogOut, Ticket } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { lovable } from '@/integrations/lovable';
+import type { User } from '@supabase/supabase-js';
+import { AuthGate } from '@/components/AuthGate';
+import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
+import { useUsage } from '@/hooks/useUsage';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+const STUDY_AI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/study-ai`;
+
+type Mode = 'explain' | 'simplify' | 'mindmap' | 'questions' | 'chat' | 'video';
+
+interface MindMapBranch {
+  label: string;
+  color: string;
+  children: string[];
+}
+
+interface MindMapData {
+  title: string;
+  branches: MindMapBranch[];
+}
+
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+}
+
+interface QuizData {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+function StudyApp() {
+  const [image, setImage] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<string | null>(null);
+  const [videoFrames, setVideoFrames] = useState<string[]>([]);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const [pdfText, setPdfText] = useState<string | null>(null);
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [pdfPageRange, setPdfPageRange] = useState("1-10");
+  const [totalPdfPages, setTotalPdfPages] = useState(0);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const pdfBufferRef = useRef<ArrayBuffer | null>(null);
+  const pdfDocRef = useRef<any>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [history, setHistory] = useState<{ id: string; title: string; mode: Mode; response: string; date: number }[]>(() => {
+    const saved = localStorage.getItem('revo_esai_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+  const [showHistory, setShowHistory] = useState(false);
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const logoUrl = logoImage;
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
+  const [isCardFullscreen, setIsCardFullscreen] = useState(false);
+
+  // Track real browser fullscreen state
+  useEffect(() => {
+    const handler = () => setIsBrowserFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  const toggleBrowserFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+    }
+  };
+
+  const toggleCardFullscreen = () => setIsCardFullscreen((v) => !v);
+
+  // Esc closes card fullscreen
+  useEffect(() => {
+    if (!isCardFullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsCardFullscreen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isCardFullscreen]);
+  const [responses, setResponses] = useState<Record<Mode, string | null>>({
+    explain: null,
+    simplify: null,
+    mindmap: null,
+    questions: null,
+    chat: null,
+    video: null
+  });
+  const [followUps, setFollowUps] = useState<Record<Mode, { question: string; answer: string }[]>>({
+    explain: [],
+    simplify: [],
+    mindmap: [],
+    questions: [],
+    chat: [],
+    video: []
+  });
+  const [followUpInput, setFollowUpInput] = useState('');
+  const [directQuestionInput, setDirectQuestionInput] = useState('');
+  const [loadingFollowUp, setLoadingFollowUp] = useState(false);
+  const [mode, setMode] = useState<Mode | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [showQuizResults, setShowQuizResults] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const responseRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('revo_esai_history', JSON.stringify(history));
+  }, [history]);
+
+  const addToHistory = (title: string, mode: Mode, response: string) => {
+    // Check if already saved to avoid duplicates
+    const isAlreadySaved = history.some(item => item.response === response);
+    if (isAlreadySaved) {
+      setError("هذا الشرح محفوظ بالفعل في السجل.");
+      return;
+    }
+
+    const newItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: title || 'بدون عنوان',
+      mode,
+      response,
+      date: Date.now()
+    };
+    setHistory(prev => [newItem, ...prev].slice(0, 50)); // Keep last 50 items
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  const deleteFromHistory = (id: string) => {
+    setHistory(prev => prev.filter(item => item.id !== id));
+  };
+
+  const isQuotaError = (err: any) => {
+    const errMsg = err?.message?.toLowerCase() || "";
+    const status = err?.status || err?.response?.status || err?.status_code;
+    return (
+      status === 429 || 
+      status === 'RESOURCE_EXHAUSTED' || 
+      errMsg.includes('quota') || 
+      errMsg.includes('429') || 
+      errMsg.includes('limit') || 
+      errMsg.includes('exhausted') ||
+      errMsg.includes('rate limit') ||
+      errMsg.includes('too many requests')
+    );
+  };
+
+  const compressImage = (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const maxDim = 800; // Reduced from 1200 for faster processing
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.5)); // Reduced quality from 0.6
+      };
+      img.src = dataUrl;
+    });
+  };
+
+  const extractVideoFrames = (videoDataUrl: string, numFrames = 6): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'auto';
+      video.muted = true;
+      video.playsInline = true;
+
+      video.onloadedmetadata = () => {
+        const duration = video.duration;
+        if (!duration || duration === Infinity) {
+          reject(new Error('Cannot read video duration'));
+          return;
+        }
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const frames: string[] = [];
+        let currentFrame = 0;
+
+        const timestamps: number[] = [];
+        for (let i = 0; i < numFrames; i++) {
+          timestamps.push((duration / (numFrames + 1)) * (i + 1));
+        }
+
+        const captureFrame = () => {
+          if (currentFrame >= timestamps.length) {
+            resolve(frames);
+            return;
+          }
+          video.currentTime = timestamps[currentFrame];
+        };
+
+        video.onseeked = () => {
+          const maxDim = 512;
+          let w = video.videoWidth;
+          let h = video.videoHeight;
+          if (w > h) {
+            if (w > maxDim) { h *= maxDim / w; w = maxDim; }
+          } else {
+            if (h > maxDim) { w *= maxDim / h; h = maxDim; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          ctx?.drawImage(video, 0, 0, w, h);
+          frames.push(canvas.toDataURL('image/jpeg', 0.5));
+          currentFrame++;
+          captureFrame();
+        };
+
+        captureFrame();
+      };
+
+      video.onerror = () => reject(new Error('Failed to load video'));
+      video.src = videoDataUrl;
+    });
+  };
+
+  const saveAsImage = async () => {
+    if (!responseRef.current) return;
+    
+    setSavingImage(true);
+    try {
+      // html-to-image is much better at handling modern CSS (oklch, variables, etc.)
+      const dataUrl = await toPng(responseRef.current, {
+        backgroundColor: document.documentElement.classList.contains('dark') ? '#020617' : '#ffffff',
+        quality: 1,
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `Revo-ESAI-${mode}-${new Date().getTime()}.png`;
+      link.click();
+    } catch (err) {
+      console.error("Error saving image:", err);
+      setError("حدث خطأ أثناء محاولة حفظ الصورة. يرجى المحاولة مرة أخرى.");
+    } finally {
+      setSavingImage(false);
+    }
+  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
+  const [youtubeTitle, setYoutubeTitle] = useState<string | null>(null);
+  const [youtubeInput, setYoutubeInput] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const usage = useUsage(user?.id);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
+    if (result.error) console.error('Google sign-in error:', result.error);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const getYoutubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const handleYoutubeSubmit = async () => {
+    const id = getYoutubeId(youtubeInput);
+    if (id) {
+      setIsViewingHistory(false);
+      const url = youtubeInput;
+      setYoutubeUrl(url);
+      setLoading(true);
+      
+      try {
+        // Try to fetch video title for better context
+        const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        if (data.title) {
+          setYoutubeTitle(data.title);
+          setFileName(`فيديو: ${data.title}`);
+        } else {
+          setFileName(`فيديو يوتيوب: ${id}`);
+        }
+      } catch (e) {
+        setFileName(`فيديو يوتيوب: ${id}`);
+      }
+
+      setResponses({
+        explain: null,
+        simplify: null,
+        mindmap: null,
+        questions: null,
+        chat: null,
+        video: null
+      });
+      setMode('video');
+      setError(null);
+      
+      // Auto-start explanation
+      setTimeout(() => {
+        processImage('explain');
+      }, 100);
+    } else {
+      setError('رابط يوتيوب غير صالح. يرجى التأكد من الرابط.');
+    }
+  };
+
+  const toggleSpeech = (text: string) => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Clean markdown for better reading
+    const cleanText = text
+      .replace(/#{1,6}\s?/g, '') // Remove headers
+      .replace(/\*\*/g, '')      // Remove bold
+      .replace(/\*/g, '')       // Remove italic
+      .replace(/\[.*\]\(.*\)/g, '') // Remove links
+      .replace(/`{1,3}.*?`{1,3}/gs, '') // Remove code blocks
+      .replace(/>\s?/g, '');     // Remove blockquotes
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'ar-SA';
+    utterance.rate = 0.85; // Slower for much better precision and clarity
+    utterance.pitch = 0.75; // Even lower pitch for a deeper masculine feel
+    
+    const voices = window.speechSynthesis.getVoices();
+    // Prioritize specific high-quality male voices if available, then any male Arabic voice
+    const arabicVoice = voices.find(v => v.lang.startsWith('ar') && (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('man') || v.name.toLowerCase().includes('naif'))) 
+                     || voices.find(v => v.lang.startsWith('ar'));
+    
+    if (arabicVoice) {
+      utterance.voice = arabicVoice;
+    }
+
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // System prompt is now on the server (edge function) for security
+
+  const MODES_CONFIG = {
+    explain: {
+      label: 'شرح مفصل',
+      icon: <BookOpen className="w-5 h-5" />,
+      prompt: `[1] الشرح المفصل — عندما يطلب "اشرح"
+ابدأ بتحديد موضوع المحتوى المرفق في جملة واحدة.
+ثم اشرح كل مفهوم بالترتيب مع:
+تعريف واضح للمصطلح
+سبب أهميته
+مثال تطبيقي من الحياة اليومية إن أمكن
+ربطه بالمفاهيم السابقة إن وجدت
+اختم بـ"نقاط يجب التذكر" (3-5 نقاط مرقمة)`
+    },
+    simplify: {
+      label: 'تبسيط وتلخيص',
+      icon: <Zap className="w-5 h-5" />,
+      prompt: `[2] التبسيط والتلخيص — عندما يطلب "بسّط" أو "لخّص"
+الهدف: يفهم الطالب في 2 دقيقة.
+الهيكل الإلزامي:
+الفكرة الأساسية: جملة واحدة تلخص كل شيء.
+أهم 5 نقاط: ...
+اتذكرها هكذا: اختصار أو جملة ذكية أو قافية تساعد على الحفظ.`
+    },
+    mindmap: {
+      label: 'خريطة ذهنية تفاعلية',
+      icon: <Network className="w-5 h-5" />,
+      prompt: `[3] الخريطة الذهنية — عندما يطلب "خريطة ذهنية"
+قم بتحويل المحتوى المرفق إلى خريطة ذهنية منظمة جداً.
+أخرج JSON فقط بالتنسيق التالي بدون أي نص إضافي:
+{
+"title": "عنوان الموضوع الرئيسي",
+"branches": [
+{
+"label": "كلمة مفتاحية للفرع",
+"color": "#HEX",
+"children": ["كلمة 1", "كلمة 2", "كلمة 3"]
+}
+]
+}
+القواعد:
+1. عدد الفروع (branches): يجب أن يتناسب طردياً مع حجم وأهمية المعلومات في المحتوى (زد عدد الفروع للمواضيع الدسمة وقللها للمواضيع البسيطة).
+2. عدد النقاط الفرعية (children): أضف النقاط الضرورية فقط لتغطية الفكرة دون حشو.
+3. الألوان المسموح بها: #4f8ef7, #7c3aed, #10b981, #f59e0b, #ef4444, #ec4899
+4. اجعل الكلمات في النقاط الفرعية قصيرة جداً لسهولة الحفظ (كلمات مفتاحية).
+5. لا تضف أي نص خارج الـ JSON أبداً.`
+    },
+    questions: {
+      label: 'اختبار تفاعلي',
+      icon: <HelpCircle className="w-5 h-5" />,
+      prompt: `[4] الاختبار التفاعلي — عندما يطلب "أسئلة" أو "اختبار"
+قم بتوليد اختبار تفاعلي بناءً على المحتوى المرفق.
+أخرج JSON فقط بالتنسيق التالي بدون أي نص إضافي:
+{
+  "title": "عنوان الاختبار",
+  "questions": [
+    {
+      "question": "نص السؤال هنا؟",
+      "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],
+      "correctAnswer": 0,
+      "explanation": "شرح بسيط لماذا هذا الخيار صحيح"
+    }
+  ]
+}
+القواعد:
+- عدد الأسئلة: 8 أسئلة متنوعة
+- نوع الأسئلة: امزج بين (4 أسئلة اختيار من متعدد) و (4 أسئلة صح أم خطأ)
+- لأسئلة الصح والخطأ: اجعل الخيارات دائماً ["صح", "خطأ"]
+- correctAnswer: هو مؤشر الخيار الصحيح (0 أو 1 أو 2 أو 3)
+- تأكد أن الأسئلة تغطي أهم النقاط في المحتوى المرفق
+- لا تضف أي نص خارج الـ JSON أبداً`
+    },
+    chat: {
+      label: 'سؤال مباشر',
+      icon: <MessageSquare className="w-5 h-5" />,
+      prompt: `[5] سؤال مباشر — عندما يطلب "سؤال"
+أجب على سؤال المستخدم المحدد بدقة بناءً على المحتوى المرفق.
+إذا كان السؤال غير متعلق بالمحتوى، حاول ربطه به أو اعتذر بلباقة.
+اجعل الإجابة مركزة ومباشرة.`
+    },
+    video: {
+      label: 'شرح الفيديو',
+      icon: <Video className="w-5 h-5" />,
+      prompt: `[6] شرح الفيديو — عندما يكون المحتوى فيديو
+قم بتحليل الفيديو المرفق (سواء كان ملفاً أو يوتيوب) بدقة.
+اشرح الأحداث الرئيسية، المفاهيم العلمية المذكورة، والخطوات التعليمية الموضحة.
+قسم الشرح إلى فقرات واضحة مع عناوين فرعية.`
+    }
+  };
+
+  const removePdfPage = (index: number) => {
+    setPdfPages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const extractPdfPages = async (rangeStr: string) => {
+    if (!pdfBufferRef.current) return;
+    
+    setLoading(true);
+    setExtractionProgress(0);
+    setError(null);
+    try {
+      if (!pdfDocRef.current) {
+        pdfDocRef.current = await pdfjsLib.getDocument({ data: pdfBufferRef.current }).promise;
+      }
+      const pdf = pdfDocRef.current;
+      setTotalPdfPages(pdf.numPages);
+      
+      // Parse range string
+      const selectedIndices: number[] = [];
+      if (rangeStr.includes('-')) {
+        const [start, end] = rangeStr.split('-').map(n => parseInt(n.trim()));
+        if (!isNaN(start) && !isNaN(end)) {
+          for (let i = Math.max(1, start); i <= Math.min(pdf.numPages, end); i++) {
+            selectedIndices.push(i);
+          }
+        }
+      } else {
+        rangeStr.split(',').forEach(n => {
+          const num = parseInt(n.trim());
+          if (!isNaN(num) && num >= 1 && num <= pdf.numPages) {
+            selectedIndices.push(num);
+          }
+        });
+      }
+
+      const finalIndices = selectedIndices.slice(0, 20);
+      const results = await Promise.all(finalIndices.map(async (i, idx) => {
+        const page = await pdf.getPage(i);
+        
+        // Extract text
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        
+        // Render to image - Aggressive downscaling for speed
+        const originalViewport = page.getViewport({ scale: 1.0 });
+        const maxDim = 800;
+        const scale = Math.min(maxDim / originalViewport.width, maxDim / originalViewport.height, 1.0);
+        const viewport = page.getViewport({ scale });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        let dataUrl = "";
+        if (context) {
+          await (page as any).render({ canvasContext: context, viewport }).promise;
+          dataUrl = canvas.toDataURL('image/jpeg', 0.4); // Lower quality for faster upload
+        }
+        
+        setExtractionProgress(Math.round(((idx + 1) / finalIndices.length) * 100));
+        return { text: `\n--- الصفحة ${i} ---\n${pageText}`, image: dataUrl };
+      }));
+      
+      setPdfPages(results.map(r => r.image).filter(img => img !== ""));
+      setPdfText(results.map(r => r.text).join(""));
+      
+      if (selectedIndices.length > 20) {
+        setError("تم استخراج أول 20 صفحة فقط لتسريع المعالجة.");
+      }
+    } catch (err) {
+      console.error("Error extracting pages:", err);
+      setError("حدث خطأ أثناء استخراج الصفحات بسرعة.");
+    } finally {
+      setLoading(false);
+      setExtractionProgress(0);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsViewingHistory(false);
+    setFileName(file.name);
+    setResponses({
+      explain: null,
+      simplify: null,
+      mindmap: null,
+      questions: null,
+      chat: null,
+      video: null
+    });
+    setFollowUps({
+      explain: [],
+      simplify: [],
+      mindmap: [],
+      questions: [],
+      chat: [],
+      video: []
+    });
+    setMode(null);
+    setError(null);
+    setImage(null);
+    setPdfText(null);
+    setPdfPages([]);
+    setVideoFile(null);
+    setVideoFrames([]);
+    setVideoName(null);
+
+    if (file.type === 'application/pdf') {
+      setLoading(true);
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        pdfBufferRef.current = arrayBuffer;
+        pdfDocRef.current = null; // Reset cached doc
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        pdfDocRef.current = pdf;
+        setTotalPdfPages(pdf.numPages);
+        
+        // Default range: 1 to min(10, total)
+        const defaultEnd = Math.min(pdf.numPages, 10);
+        const defaultRange = `1-${defaultEnd}`;
+        setPdfPageRange(defaultRange);
+        
+        await extractPdfPages(defaultRange);
+      } catch (err) {
+        console.error("Error parsing PDF:", err);
+        setError("تعذر قراءة ملف الـ PDF. يرجى التأكد من أن الملف غير محمي بكلمة مرور.");
+      } finally {
+        setLoading(false);
+      }
+    } else if (file.type.startsWith('video/')) {
+      if (file.size > 20 * 1024 * 1024) {
+        setError('عذراً، حجم الفيديو كبير جداً. يرجى رفع فيديو أقل من 20 ميجابايت.');
+        return;
+      }
+      setLoading(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        setVideoFile(dataUrl);
+        setVideoName(file.name);
+        setYoutubeUrl(null);
+        try {
+          const frames = await extractVideoFrames(dataUrl, 8);
+          setVideoFrames(frames);
+          setMode('explain');
+          await processImage('explain', false, undefined, {
+            videoFile: dataUrl,
+            videoFrames: frames,
+          });
+        } catch (err) {
+          console.error('Error extracting video frames:', err);
+          setError('تعذر استخراج إطارات الفيديو. يرجى المحاولة مرة أخرى.');
+          setLoading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string);
+        setImage(compressed);
+        setMode('explain');
+        await processImage('explain', false, undefined, {
+          image: compressed,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      setIsCameraOpen(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      setError('تعذر الوصول إلى الكاميرا. يرجى التأكد من منح الأذونات اللازمة.');
+      setIsCameraOpen(false);
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg');
+        const compressed = await compressImage(dataUrl);
+        setImage(compressed);
+        stopCamera();
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const streamFromEdge = async (
+    userContent: string,
+    onDelta: (text: string) => void,
+    imageDataUrls?: string[]
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) throw new Error("AUTH_REQUIRED");
+
+    const resp = await fetch(STUDY_AI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: userContent }],
+        ...(imageDataUrls && imageDataUrls.length > 0 ? { images: imageDataUrls } : {}),
+      }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      if (resp.status === 401) throw new Error("AUTH_REQUIRED");
+      if (resp.status === 403 && body.code === "no_quota") throw new Error("NO_QUOTA");
+      if (resp.status === 429) throw new Error("RATE_LIMIT");
+      if (resp.status === 402) throw new Error("PAYMENT_REQUIRED");
+      throw new Error(body.error || "خطأ في الخادم");
+    }
+
+    if (!resp.body) throw new Error("No response body");
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        let line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (!line.startsWith("data: ")) continue;
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) onDelta(content);
+        } catch {
+          buf = line + "\n" + buf;
+          break;
+        }
+      }
+    }
+  };
+
+  const processImage = async (
+    selectedMode: Mode,
+    forceRegenerate = false,
+    customQuestion?: string,
+    mediaOverrides?: {
+      image?: string | null;
+      pdfPages?: string[];
+      pdfText?: string | null;
+      videoFile?: string | null;
+      videoFrames?: string[];
+    }
+  ) => {
+    const currentImage = mediaOverrides?.image ?? image;
+    const currentPdfText = mediaOverrides?.pdfText ?? pdfText;
+    const currentPdfPages = mediaOverrides?.pdfPages ?? pdfPages;
+    const currentVideoFile = mediaOverrides?.videoFile ?? videoFile;
+    const currentVideoFrames = mediaOverrides?.videoFrames ?? videoFrames;
+
+    if (!currentImage && !currentPdfText && !youtubeUrl && !currentVideoFile) return;
+
+    if (!user) {
+      setError('يجب تسجيل الدخول بحساب جوجل أولاً لاستخدام هذه الميزة. اضغط على زر "دخول بجوجل" في الأعلى.');
+      setLoading(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+
+    if (responses[selectedMode] && !forceRegenerate && !customQuestion) {
+      setMode(selectedMode);
+      setError(null);
+      return;
+    }
+
+    if (selectedMode === 'chat' && !customQuestion && !responses.chat && !forceRegenerate) {
+      setMode(selectedMode);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setMode(selectedMode);
+    setError(null);
+    
+    if (selectedMode === 'questions') {
+      setQuizAnswers({});
+      setShowQuizResults(false);
+    }
+
+    if (forceRegenerate || customQuestion) {
+      setResponses(prev => ({ ...prev, [selectedMode]: null }));
+    }
+
+    try {
+      let promptText = customQuestion 
+        ? `سؤال المستخدم: ${customQuestion}\n\nأجب بناءً على المحتوى المرفق.`
+        : `المهمة المطلوبة:\n${MODES_CONFIG[selectedMode].prompt}`;
+
+      if (currentPdfText) {
+        promptText += `\n\nالمحتوى النصي المستخرج (للمساعدة): \n${currentPdfText}`;
+      }
+
+      if (currentPdfPages.length > 0) {
+        promptText += `\n\nتعليمات هامة: لقد تم تحويل ملف الـ PDF المرفق إلى صور لكل صفحة. يرجى الاعتماد بشكل أساسي على الصور المرفقة لتحليل المحتوى بدقة.`;
+      }
+
+      if (youtubeUrl) {
+        promptText += `\n\nرابط فيديو يوتيوب للمادة العلمية: ${youtubeUrl}`;
+        if (youtubeTitle) {
+          promptText += `\nعنوان الفيديو: ${youtubeTitle}`;
+        }
+        promptText += `\n\nتعليمات هامة للفيديو:
+1. قم بتحليل محتوى هذا الفيديو التعليمي بناءً على عنوانه وسياقه المعروف لديك.
+2. قدم شرحاً شاملاً ومنظماً للمواضيع التي يتناولها الفيديو عادةً بناءً على هذا العنوان.
+3. إذا كان الفيديو يحتوي على مفاهيم معقدة، قم بتبسيطها.
+4. اجعل الرد سريعاً ومباشراً دون مقدمات طويلة.`;
+      }
+
+      if (currentVideoFrames.length > 0) {
+        promptText += `\n\nتعليمات هامة للفيديو المرفق:
+تم استخراج ${currentVideoFrames.length} إطارات (لقطات) من الفيديو المرفق وإرسالها كصور.
+1. قم بتحليل هذه الإطارات بدقة لفهم محتوى الفيديو البصري.
+2. اشرح المفاهيم العلمية أو التعليمية الواردة فيها.
+3. ركز على التفاصيل البصرية في كل إطار واربط بينها لتقديم شرح متسلسل ومنطقي.`;
+      }
+
+      // Collect all images to send as multimodal content
+      const allImages: string[] = [];
+      
+      if (currentImage) {
+        allImages.push(currentImage);
+      }
+      
+      if (currentPdfPages.length > 0) {
+        allImages.push(...currentPdfPages);
+      }
+
+      if (currentVideoFrames.length > 0) {
+        allImages.push(...currentVideoFrames);
+      }
+
+      let fullText = "";
+      await streamFromEdge(promptText, (delta) => {
+        fullText += delta;
+        setResponses(prev => ({ ...prev, [selectedMode]: fullText }));
+      }, allImages.length > 0 ? allImages : undefined);
+
+    } catch (err: any) {
+      console.error(err);
+      if (err.message === "AUTH_REQUIRED") {
+        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
+      } else if (err.message === "NO_QUOTA") {
+        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
+        setShowRedeemDialog(true);
+      } else if (err.message === "RATE_LIMIT") {
+        setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
+      } else if (err.message === "PAYMENT_REQUIRED") {
+        setError('يرجى إضافة رصيد لحساب Lovable AI.');
+      } else {
+        setError('حدث خطأ أثناء معالجة البيانات. يرجى المحاولة مرة أخرى.');
+      }
+    } finally {
+      setLoading(false);
+      usage.refresh();
+    }
+  };
+
+  const askFollowUp = async () => {
+    if (!followUpInput.trim() || !mode || (!image && !pdfText && !youtubeUrl && !videoFile)) return;
+
+    const question = followUpInput.trim();
+    setFollowUpInput('');
+    setLoadingFollowUp(true);
+
+    try {
+      const previousContext = responses[mode];
+      let promptText = `لقد قمت مسبقاً بتقديم هذا الرد بناءً على المحتوى المرفق:\n${previousContext}\n\nالآن، الطالب لديه سؤال إضافي:\n${question}`;
+      
+      if (pdfText) {
+        promptText += `\n\nالمحتوى النصي المستخرج (للمساعدة): \n${pdfText}`;
+      }
+
+      if (youtubeUrl) {
+        promptText += `\n\nرابط فيديو يوتيوب المرجعي: ${youtubeUrl}`;
+      }
+
+      if (videoFile) {
+        promptText += `\n\nلقد تم إرفاق فيديو تعليمي مباشر. يرجى استخدامه كمرجع أساسي للإجابة.`;
+      }
+
+      setFollowUps(prev => ({
+        ...prev,
+        [mode]: [...prev[mode], { question, answer: "" }]
+      }));
+
+      // Collect images for follow-up context
+      const allImages: string[] = [];
+      if (image) allImages.push(image);
+      if (pdfPages.length > 0) allImages.push(...pdfPages);
+      if (videoFrames.length > 0) allImages.push(...videoFrames);
+
+      let fullAnswer = "";
+      await streamFromEdge(promptText, (delta) => {
+        fullAnswer += delta;
+        setFollowUps(prev => {
+          const currentFollowUps = [...prev[mode]];
+          currentFollowUps[currentFollowUps.length - 1].answer = fullAnswer;
+          return { ...prev, [mode]: currentFollowUps };
+        });
+      }, allImages.length > 0 ? allImages : undefined);
+
+    } catch (err: any) {
+      console.error("Follow-up Error:", err);
+      if (err.message === "AUTH_REQUIRED") {
+        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
+      } else if (err.message === "NO_QUOTA") {
+        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
+        setShowRedeemDialog(true);
+      } else if (err.message === "RATE_LIMIT") {
+        setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
+      } else if (err.message === "PAYMENT_REQUIRED") {
+        setError('يرجى إضافة رصيد لحساب Lovable AI.');
+      } else {
+        setError(`حدث خطأ أثناء إرسال السؤال: ${(err?.message || '').substring(0, 100)}`);
+      }
+    } finally {
+      setLoadingFollowUp(false);
+      usage.refresh();
+    }
+  };
+
+  const renderMindMap = (data: string) => {
+    try {
+      const jsonMatch = data.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return <div className="markdown-body"><ReactMarkdown>{data}</ReactMarkdown></div>;
+      
+      const jsonStr = jsonMatch[0];
+      const json: MindMapData = JSON.parse(jsonStr);
+
+      return (
+        <div className="relative py-16 px-4 overflow-hidden bg-white dark:bg-slate-900 rounded-3xl transition-colors">
+          {/* SVG Definitions for Arrows and Gradients */}
+          <svg className="absolute inset-0 pointer-events-none w-full h-full overflow-visible">
+            <defs>
+              {json.branches.map((branch, idx) => (
+                <linearGradient key={`grad-${idx}`} id={`grad-${idx}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor={branch.color} stopOpacity="1" />
+                </linearGradient>
+              ))}
+              {json.branches.map((branch, idx) => (
+                <marker
+                  key={`arrow-${idx}`}
+                  id={`arrowhead-${idx}`}
+                  markerWidth="12"
+                  markerHeight="10"
+                  refX="11"
+                  refY="5"
+                  orient="auto"
+                >
+                  <path d="M0,0 L12,5 L0,10 Z" fill={branch.color} />
+                </marker>
+              ))}
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+          </svg>
+
+          {/* Central Node */}
+          <div className="flex justify-center mb-32 relative z-20">
+            <motion.div 
+              initial={{ scale: 0, rotate: -5 }}
+              animate={{ scale: 1, rotate: 0 }}
+              whileHover={{ scale: 1.05 }}
+              className="bg-indigo-600 text-white px-10 py-5 rounded-3xl shadow-2xl shadow-indigo-200 dark:shadow-indigo-900/40 font-black text-2xl border-4 border-white dark:border-slate-800 relative z-10"
+            >
+              <div className="flex items-center gap-3">
+                <Network className="w-8 h-8" />
+                {json.title}
+              </div>
+              {/* Pulsing glow */}
+              <div className="absolute inset-0 bg-indigo-400 rounded-3xl blur-xl opacity-20 animate-pulse -z-10" />
+            </motion.div>
+          </div>
+
+          {/* Branches Container */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 relative z-10">
+            {json.branches.map((branch, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.15, type: "spring", stiffness: 100 }}
+                className="relative"
+              >
+                {/* Connection Line from Center (SVG) */}
+                <svg className="absolute -top-32 left-1/2 -translate-x-1/2 w-full h-32 pointer-events-none overflow-visible hidden lg:block">
+                  <motion.path 
+                    d={(() => {
+                      const col = idx % 3;
+                      if (col === 0) return "M 200 0 Q 200 60, 0 60 T 0 120"; 
+                      if (col === 1) return "M 0 0 L 0 120"; 
+                      return "M -200 0 Q -200 60, 0 60 T 0 120";
+                    })()}
+                    fill="none"
+                    stroke={`url(#grad-${idx})`}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    filter="url(#glow)"
+                    markerEnd={`url(#arrowhead-${idx})`}
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.8 }}
+                    transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
+                  />
+                </svg>
+                <svg className="absolute -top-32 left-1/2 -translate-x-1/2 w-full h-32 pointer-events-none overflow-visible hidden md:block lg:hidden">
+                  <motion.path 
+                    d={idx % 2 === 0 
+                      ? "M 100 0 Q 100 60, 0 60 T 0 120" 
+                      : "M -100 0 Q -100 60, 0 60 T 0 120"
+                    }
+                    fill="none"
+                    stroke={`url(#grad-${idx})`}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    filter="url(#glow)"
+                    markerEnd={`url(#arrowhead-${idx})`}
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.8 }}
+                    transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
+                  />
+                </svg>
+
+                {/* Branch Card */}
+                <div className="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-t-4 transition-all hover:shadow-2xl hover:-translate-y-1" style={{ borderTopColor: branch.color }}>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div 
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0 rotate-3 group-hover:rotate-0 transition-transform"
+                      style={{ backgroundColor: branch.color }}
+                    >
+                      <Zap className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-xl font-black tracking-tight" style={{ color: branch.color }}>{branch.label}</h3>
+                  </div>
+
+                  {/* Sub-points as a Chain of Nodes */}
+                  <div className="flex flex-col items-center gap-4 relative">
+                    {branch.children.map((child, cIdx) => (
+                      <div key={cIdx} className="flex flex-col items-center w-full">
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: (idx * 0.1) + (cIdx * 0.1) }}
+                          className="bg-gray-50 dark:bg-slate-900/60 px-4 py-2 rounded-full border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all text-center min-w-[100px]"
+                        >
+                          <p className="text-sm font-bold text-gray-700 dark:text-slate-200">{child}</p>
+                        </motion.div>
+                        
+                        {cIdx < branch.children.length - 1 && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 24, opacity: 1 }}
+                            transition={{ delay: (idx * 0.1) + (cIdx * 0.1) + 0.05 }}
+                            className="w-0.5 bg-gradient-to-b from-transparent via-gray-300 dark:via-slate-600 to-transparent my-1 relative"
+                          >
+                            <div 
+                              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px]"
+                              style={{ borderTopColor: branch.color }}
+                            />
+                          </motion.div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Background Decorative Elements */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-overlay" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-overlay" />
+          </div>
+        </div>
+      );
+    } catch (e) {
+      return <div className="text-red-500">تعذر عرض الخريطة الذهنية بشكل صحيح. الرد: {data}</div>;
+    }
+  };
+
+  const renderQuiz = (data: string) => {
+    try {
+      const jsonMatch = data.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return <div className="markdown-body"><ReactMarkdown>{data}</ReactMarkdown></div>;
+      
+      const jsonStr = jsonMatch[0];
+      const quiz: QuizData = JSON.parse(jsonStr);
+
+      const handleOptionSelect = (qIdx: number, oIdx: number) => {
+        if (showQuizResults) return;
+        setQuizAnswers(prev => ({ ...prev, [qIdx]: oIdx }));
+      };
+
+      const calculateScore = () => {
+        let score = 0;
+        quiz.questions.forEach((q, idx) => {
+          if (quizAnswers[idx] === q.correctAnswer) score++;
+        });
+        return score;
+      };
+
+      return (
+        <div className="space-y-8 py-4">
+          <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
+            <div>
+              <h3 className="text-xl font-bold text-indigo-900 dark:text-indigo-100">{quiz.title}</h3>
+              <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">اختبر معلوماتك بناءً على المادة الدراسية</p>
+            </div>
+            {showQuizResults && (
+              <div className="text-center">
+                <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{calculateScore()} / {quiz.questions.length}</div>
+                <div className="text-xs font-bold text-indigo-500 uppercase tracking-wider">النتيجة النهائية</div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {quiz.questions.map((q, qIdx) => (
+              <motion.div 
+                key={qIdx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: qIdx * 0.1 }}
+                className="bg-white dark:bg-slate-800/50 rounded-2xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm"
+              >
+                <div className="flex gap-4 mb-6">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold text-sm shrink-0">
+                    {qIdx + 1}
+                  </span>
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{q.question}</h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {q.options.map((option, oIdx) => {
+                    const isSelected = quizAnswers[qIdx] === oIdx;
+                    const isCorrect = q.correctAnswer === oIdx;
+                    const isWrong = isSelected && !isCorrect;
+                    
+                    let bgColor = 'bg-gray-50 dark:bg-slate-900/50';
+                    let borderColor = 'border-gray-100 dark:border-slate-800';
+                    let textColor = 'text-gray-700 dark:text-slate-300';
+
+                    if (showQuizResults) {
+                      if (isCorrect) {
+                        bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
+                        borderColor = 'border-emerald-500';
+                        textColor = 'text-emerald-700 dark:text-emerald-400';
+                      } else if (isWrong) {
+                        bgColor = 'bg-red-50 dark:bg-red-900/20';
+                        borderColor = 'border-red-500';
+                        textColor = 'text-red-700 dark:text-red-400';
+                      }
+                    } else if (isSelected) {
+                      bgColor = 'bg-indigo-50 dark:bg-indigo-900/20';
+                      borderColor = 'border-indigo-500';
+                      textColor = 'text-indigo-700 dark:text-indigo-300';
+                    }
+
+                    return (
+                      <button
+                        key={oIdx}
+                        disabled={showQuizResults}
+                        onClick={() => handleOptionSelect(qIdx, oIdx)}
+                        className={`w-full text-right p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${bgColor} ${borderColor} ${textColor} ${!showQuizResults && 'hover:border-indigo-300 dark:hover:border-indigo-700'}`}
+                      >
+                        <span className="font-medium">{option}</span>
+                        {showQuizResults && isCorrect && <Zap className="w-4 h-4 text-emerald-500" />}
+                        {showQuizResults && isWrong && <X className="w-4 h-4 text-red-500" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {showQuizResults && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mt-4 p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-xl border-l-4 border-indigo-400"
+                  >
+                    <p className="text-sm text-indigo-800 dark:text-indigo-300">
+                      <span className="font-bold ml-1">التفسير:</span>
+                      {q.explanation}
+                    </p>
+                  </motion.div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+
+          {showQuizResults && (
+            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
+              <button
+                onClick={() => {
+                  setQuizAnswers({});
+                  setShowQuizResults(false);
+                }}
+                className="px-8 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-2 border-indigo-600 dark:border-indigo-500 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-5 h-5" />
+                إعادة المحاولة
+              </button>
+              <button
+                onClick={() => processImage('questions', true)}
+                className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 flex items-center justify-center gap-2"
+              >
+                <Zap className="w-5 h-5" />
+                توليد أسئلة جديدة
+              </button>
+            </div>
+          )}
+
+          {!showQuizResults && (
+            <div className="flex justify-center pt-4">
+              <button
+                disabled={Object.keys(quizAnswers).length < quiz.questions.length}
+                onClick={() => setShowQuizResults(true)}
+                className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 dark:shadow-indigo-900/40 disabled:opacity-50 disabled:shadow-none flex items-center gap-3"
+              >
+                <Zap className="w-6 h-6" />
+                تصحيح الاختبار
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    } catch (e) {
+      return <div className="text-red-500">تعذر عرض الاختبار بشكل صحيح. الرد: {data}</div>;
+    }
+  };
+
+  if (!authChecked) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  }
+  if (!user) {
+    return <AuthGate />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
+      <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
+      {/* Header */}
+      <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors">
+        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-transparent rounded-xl flex items-center justify-center overflow-hidden">
+              <img 
+                src={logoUrl} 
+                alt="" 
+                className="w-full h-full object-contain" 
+                referrerPolicy="no-referrer"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Revo ESAI</h1>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Usage / Subscription badge */}
+            <button
+              onClick={() => setShowRedeemDialog(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+              title="تفعيل كود اشتراك"
+            >
+              <Ticket className="w-4 h-4" />
+              {usage.hasActiveSubscription ? (
+                <span className="hidden sm:inline">
+                  ينتهي {new Date(usage.subscriptionExpiresAt!).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+                </span>
+              ) : (
+                <span>متبقي {usage.freeRemaining}/4</span>
+              )}
+            </button>
+            <button 
+              onClick={() => setShowHistory(!showHistory)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors relative"
+              title="السجل"
+            >
+              <FileText className="w-5 h-5" />
+              {history.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full">
+                  {history.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={toggleBrowserFullscreen}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+              title={isBrowserFullscreen ? 'إنهاء وضع ملء الشاشة' : 'وضع ملء الشاشة'}
+            >
+              {isBrowserFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            {user ? (
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                title="تسجيل الخروج"
+              >
+                {user.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
+                ) : (
+                  <LogOut className="w-5 h-5" />
+                )}
+                <span className="text-sm hidden sm:block">خروج</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleGoogleSignIn}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors shadow-md animate-pulse"
+                title="تسجيل الدخول بجوجل"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>دخول بجوجل</span>
+              </button>
+            )}
+            <div className="text-sm text-gray-500 dark:text-slate-300 font-medium hidden sm:block">مساعدك التعليمي الذكي</div>
+          </div>
+        </div>
+      </header>
+
+      <main className={`${mode === 'mindmap' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 py-8 transition-all duration-500`}>
+        {(!image && !pdfText && !youtubeUrl && !videoFile && !isViewingHistory) ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-gray-300 dark:border-slate-700 p-12 text-center space-y-6 transition-colors"
+          >
+            {loading ? (
+              <div className="space-y-4">
+                <Loader2 className="w-16 h-16 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto" />
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">جاري معالجة البيانات...</h2>
+                <p className="text-gray-500 dark:text-slate-300">يرجى الانتظار قليلاً</p>
+              </div>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mx-auto">
+                  <Upload className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">ابدأ رحلة التعلم</h2>
+                  <p className="text-gray-500 dark:text-slate-300">ارفع صورة، ملف PDF، أو ضع رابط فيديو يوتيوب</p>
+                </div>
+                
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 flex items-center justify-center gap-2"
+                    >
+                      <Upload className="w-5 h-5" />
+                      رفع ملف
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'video/*';
+                        input.onchange = (e) => handleFileUpload(e as any);
+                        input.click();
+                      }}
+                      className="flex-1 px-6 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-2 border-indigo-600 dark:border-indigo-500 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Video className="w-5 h-5" />
+                      فيديو
+                    </button>
+                    <button 
+                      onClick={startCamera}
+                      className="flex-1 px-6 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-2 border-indigo-600 dark:border-indigo-500 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Camera className="w-5 h-5" />
+                      كاميرا
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <Youtube className="h-5 w-5 text-red-500" />
+                    </div>
+                    <input 
+                      type="text"
+                      value={youtubeInput}
+                      onChange={(e) => setYoutubeInput(e.target.value)}
+                      placeholder="ضع رابط فيديو يوتيوب هنا..."
+                      className="block w-full pr-10 pl-20 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm dark:text-white"
+                    />
+                    <button 
+                      onClick={handleYoutubeSubmit}
+                      disabled={!youtubeInput.trim()}
+                      className="absolute left-1 top-1 bottom-1 px-4 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                    >
+                      تحليل الفيديو
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept="image/*,application/pdf,video/*" 
+              className="hidden" 
+            />
+          </motion.div>
+        ) : (
+          <div className="space-y-8">
+            {/* Image/PDF Preview & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1">
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-md sticky top-24 z-30 transition-colors">
+                  <div className="relative group rounded-xl overflow-hidden aspect-[3/4] bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+                    {image ? (
+                      <img 
+                        src={image} 
+                        alt="Study Material" 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : videoFile ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-slate-900">
+                        <video 
+                          src={videoFile} 
+                          controls 
+                          className="w-full aspect-video rounded-lg shadow-lg"
+                        />
+                        <p className="text-white text-xs mt-4 font-bold">{videoName}</p>
+                      </div>
+                    ) : youtubeUrl ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-slate-900">
+                        <iframe 
+                          className="w-full aspect-video rounded-lg shadow-lg"
+                          src={`https://www.youtube.com/embed/${getYoutubeId(youtubeUrl)}`}
+                          title="YouTube video player"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                        <div className="mt-4 text-center">
+                          <p className="text-xs text-slate-400 font-medium">
+                            {loading ? "جاري استخراج المعلومات من الفيديو..." : "تم ربط الفيديو بنجاح"}
+                          </p>
+                        </div>
+                      </div>
+                    ) : isViewingHistory ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                        <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
+                          <History className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">أنت تشاهد شرحاً محفوظاً</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">المصدر الأصلي غير متاح حالياً في المعاينة</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setIsViewingHistory(false);
+                            setMode(null);
+                          }}
+                          className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          العودة للرئيسية
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 text-indigo-600 dark:text-indigo-400 p-4 text-center w-full h-full overflow-hidden">
+                        {pdfPages.length > 0 ? (
+                          <div className="w-full flex-1 flex flex-col overflow-hidden">
+                            {extractionProgress > 0 && extractionProgress < 100 && (
+                              <div className="mb-2 bg-gray-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-indigo-600 h-full transition-all duration-300" 
+                                  style={{ width: `${extractionProgress}%` }}
+                                />
+                              </div>
+                            )}
+                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl mb-3 border border-indigo-100 dark:border-indigo-800/30">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">تحديد الصفحات (من {totalPdfPages})</span>
+                                <HelpCircle className="w-3 h-3 text-indigo-400 cursor-help" />
+                              </div>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  value={pdfPageRange}
+                                  onChange={(e) => setPdfPageRange(e.target.value)}
+                                  placeholder="مثلاً: 1-5"
+                                  className="flex-1 px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-md outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <button 
+                                  onClick={() => extractPdfPages(pdfPageRange)}
+                                  className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-md hover:bg-indigo-700 transition-colors"
+                                >
+                                  تحديث
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto space-y-2 p-1 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-gray-100 dark:border-slate-800">
+                              <p className="text-[10px] text-gray-400 sticky top-0 bg-gray-50 dark:bg-slate-900 py-1 z-10">المعاينة ({pdfPages.length} صور):</p>
+                              {pdfPages.map((page, idx) => (
+                                <div key={idx} className="relative group">
+                                  <img src={page} alt={`Page ${idx + 1}`} className="w-full rounded-lg shadow-sm border border-gray-200 dark:border-slate-700" />
+                                  <span className="absolute top-1 right-1 bg-black/50 text-white text-[8px] px-1.5 py-0.5 rounded-md">ص {idx + 1}</span>
+                                  <button 
+                                    onClick={() => removePdfPage(idx)}
+                                    className="absolute top-1 left-1 bg-red-500/80 hover:bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                    title="حذف هذه الصفحة"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center">
+                            <FileText className="w-16 h-16 flex-shrink-0 animate-pulse" />
+                            <p className="text-xs mt-2">جاري تحويل صفحات الـ PDF إلى صور...</p>
+                          </div>
+                        )}
+                        <div className="w-full text-right">
+                          <span className="font-bold text-xs block truncate">{fileName}</span>
+                          <span className="text-[10px] text-gray-400">تم التحويل محلياً وبانتظار التحليل</span>
+                        </div>
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => { 
+                        window.speechSynthesis.cancel();
+                        setIsSpeaking(false);
+                        setImage(null); 
+                        setPdfText(null);
+                        setPdfPages([]);
+                        setPdfPageRange("1-10");
+                        setTotalPdfPages(0);
+                        setExtractionProgress(0);
+                        pdfBufferRef.current = null;
+                        pdfDocRef.current = null;
+                        setYoutubeUrl(null);
+                        setYoutubeTitle(null);
+                        setYoutubeInput('');
+                        setVideoFile(null);
+                        setVideoFrames([]);
+                        setVideoName(null);
+                        setFileName(null);
+                        setResponses({
+                          explain: null,
+                          simplify: null,
+                          mindmap: null,
+                          questions: null,
+                          chat: null,
+                          video: null
+                        }); 
+                        setFollowUps({
+                          explain: [],
+                          simplify: [],
+                          mindmap: [],
+                          questions: [],
+                          chat: [],
+                          video: []
+                        });
+                        setMode(null); 
+                      }}
+                      className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="mt-4 p-2 space-y-2">
+                    <p className="text-xs text-gray-400 dark:text-slate-400 text-center">اختر ماذا تريد أن أفعل بالمحتوى:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(MODES_CONFIG) as Mode[])
+                        .filter((m) => m !== 'video' || videoFile || youtubeUrl)
+                        .map((m) => (
+                        <button
+                          key={m}
+                          disabled={loading}
+                          onClick={() => {
+                            window.speechSynthesis.cancel();
+                            setIsSpeaking(false);
+                            processImage(m);
+                          }}
+                          className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all border-2 ${
+                            m === 'chat' ? 'col-span-2 py-4 bg-indigo-600/5 dark:bg-indigo-400/5 border-indigo-200 dark:border-indigo-800' : ''
+                          } ${
+                            mode === m 
+                              ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-600 dark:border-indigo-500 text-indigo-600 dark:text-indigo-300' 
+                              : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10'
+                          } disabled:opacity-50`}
+                        >
+                          <div className={`${m === 'chat' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>
+                            {MODES_CONFIG[m].icon}
+                          </div>
+                          <span className={`text-xs font-bold ${m === 'chat' ? 'text-sm text-indigo-700 dark:text-indigo-300' : ''}`}>
+                            {MODES_CONFIG[m].label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Response Area */}
+              <div className="lg:col-span-2">
+                <AnimatePresence mode="wait">
+                  {loading ? (
+                    <motion.div 
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="bg-white dark:bg-slate-900 rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-4 shadow-sm min-h-[400px] transition-colors"
+                    >
+                      <Loader2 className="w-12 h-12 text-indigo-600 dark:text-indigo-400 animate-spin" />
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">جاري التحليل...</h3>
+                        <p className="text-gray-500 dark:text-slate-300">أقوم بقراءة المادة العلمية وتجهيز أفضل رد لك</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setLoading(false);
+                          setError("تم إلغاء العملية. يمكنك المحاولة مرة أخرى.");
+                        }}
+                        className="mt-4 text-sm text-gray-400 hover:text-red-500 transition-colors underline"
+                      >
+                        إلغاء العملية
+                      </button>
+                    </motion.div>
+                  ) : (mode === 'chat' && !responses.chat) ? (
+                    <motion.div 
+                      key="chat-input"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white dark:bg-slate-900 rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-8 shadow-sm min-h-[400px] transition-colors border border-indigo-100 dark:border-indigo-900/30"
+                    >
+                      <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
+                        <MessageSquare className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="max-w-md w-full space-y-4">
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">اسأل أي شيء عن الصورة</h3>
+                        <p className="text-gray-500 dark:text-slate-300 text-sm">اكتب سؤالك وسأقوم بتحليل الصورة والإجابة عليك فوراً</p>
+                        <div className="relative mt-6">
+                          <textarea 
+                            value={directQuestionInput}
+                            onChange={(e) => setDirectQuestionInput(e.target.value)}
+                            placeholder="مثلاً: ما هي الفكرة الرئيسية في هذه الصفحة؟"
+                            className="w-full p-4 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm dark:text-white min-h-[120px] resize-none"
+                          />
+                          <button 
+                            onClick={() => {
+                              if (directQuestionInput.trim()) {
+                                processImage('chat', false, directQuestionInput);
+                                setDirectQuestionInput('');
+                              }
+                            }}
+                            disabled={!directQuestionInput.trim()}
+                            className="mt-4 w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            <Zap className="w-5 h-5" />
+                            إرسال السؤال
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : (mode && responses[mode]) ? (
+                    <motion.div 
+                      key="response"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`bg-white dark:bg-slate-900 shadow-sm border border-gray-100 dark:border-slate-800 transition-colors rounded-2xl p-8 min-h-[400px] ${isCardFullscreen ? 'fixed inset-0 z-[100] overflow-y-auto rounded-none m-0 max-w-none' : ''}`}
+                    >
+                      {/* Top action bar with card fullscreen toggle */}
+                      <div className="flex items-center justify-end mb-3">
+                        <button
+                          onClick={toggleCardFullscreen}
+                          className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                          title={isCardFullscreen ? 'إنهاء العرض الكامل للكرت' : 'عرض الكرت بالكامل'}
+                        >
+                          {isCardFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-slate-800 pb-4">
+                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-300">
+                          {mode && MODES_CONFIG[mode].icon}
+                          <span className="font-bold">{mode && MODES_CONFIG[mode].label}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => mode && responses[mode] && addToHistory(fileName || 'مادة علمية', mode, responses[mode]!)}
+                            disabled={isSaved}
+                            className={`${isSaved ? 'text-green-500' : 'text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'} transition-colors flex items-center gap-1`}
+                            title="حفظ في السجل"
+                          >
+                            <span className="text-xs hidden sm:block">{isSaved ? "تم الحفظ" : "حفظ بالسجل"}</span>
+                            {isSaved ? <RefreshCw className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
+                          </button>
+                          <button 
+                            onClick={saveAsImage}
+                            disabled={savingImage}
+                            className={`${savingImage ? 'opacity-50 cursor-not-allowed' : 'text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'} transition-colors flex items-center gap-1`}
+                            title="حفظ كصورة"
+                          >
+                            <span className="text-xs hidden sm:block">{savingImage ? "جاري الحفظ..." : "حفظ كصورة"}</span>
+                            {savingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                          </button>
+                          {mode && ['explain', 'simplify', 'chat'].includes(mode) && (
+                            <button 
+                              onClick={() => toggleSpeech(responses[mode]!)}
+                              className={`${isSpeaking ? 'text-red-500 animate-pulse' : 'text-gray-400 dark:text-slate-400'} hover:text-indigo-600 transition-colors flex items-center gap-1`}
+                              title={isSpeaking ? "إيقاف القراءة" : "قراءة النص"}
+                            >
+                              <span className="text-xs hidden sm:block">{isSpeaking ? "إيقاف" : "قراءة"}</span>
+                              {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => {
+                              window.speechSynthesis.cancel();
+                              setIsSpeaking(false);
+                              if (mode === 'chat') {
+                                setResponses(prev => ({ ...prev, chat: null }));
+                              } else if (mode) {
+                                processImage(mode, true);
+                              }
+                            }}
+                            className="text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-1"
+                            title={mode === 'chat' ? "سؤال جديد" : "إعادة التوليد"}
+                          >
+                            <span className="text-xs hidden sm:block">{mode === 'chat' ? "سؤال جديد" : "إعادة التوليد"}</span>
+                            <RefreshCw className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div ref={responseRef} className="prose prose-indigo dark:prose-invert max-w-none dark:text-slate-100 p-4 rounded-xl">
+                        {mode === 'mindmap' ? (
+                          renderMindMap(responses[mode]!)
+                        ) : mode === 'questions' ? (
+                          renderQuiz(responses[mode]!)
+                        ) : (
+                          <ReactMarkdown>{responses[mode]!}</ReactMarkdown>
+                        )}
+                      </div>
+
+                      {/* Follow-up Questions Section */}
+                      <div className="mt-12 pt-8 border-t border-gray-100 dark:border-slate-800">
+                        <div className="space-y-6 mb-8">
+                          {followUps[mode].map((fu, idx) => (
+                            <motion.div 
+                              key={idx}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="space-y-3"
+                            >
+                              <div className="flex items-start gap-3 justify-end">
+                                <div className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-900 dark:text-white p-3 rounded-2xl rounded-tr-none text-sm font-medium">
+                                  {fu.question}
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0">
+                                  <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-200" />
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0">
+                                  <BookOpen className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl rounded-tl-none shadow-sm text-sm leading-relaxed dark:text-slate-100">
+                                  <ReactMarkdown>{fu.answer}</ReactMarkdown>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                          
+                          {loadingFollowUp && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0">
+                                <Loader2 className="w-4 h-4 text-white animate-spin" />
+                              </div>
+                              <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl rounded-tl-none text-sm text-gray-500 dark:text-slate-400 italic">
+                                جاري التفكير في سؤالك...
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            value={followUpInput}
+                            onChange={(e) => setFollowUpInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && askFollowUp()}
+                            placeholder="هل لديك سؤال إضافي حول هذا الموضوع؟"
+                            className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm dark:text-white dark:placeholder-slate-500"
+                          />
+                          <button 
+                            onClick={askFollowUp}
+                            disabled={loadingFollowUp || !followUpInput.trim()}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all disabled:opacity-30"
+                          >
+                            <Zap className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : error ? (
+                    <motion.div 
+                      key="error"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-8 text-center space-y-4 transition-colors"
+                    >
+                      <HelpCircle className="w-12 h-12 text-red-500 mx-auto" />
+                      <p className="text-red-700 dark:text-red-400 font-medium">{error}</p>
+                      <button 
+                        onClick={() => mode && processImage(mode)}
+                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors"
+                      >
+                        إعادة المحاولة
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-4 min-h-[400px] transition-colors"
+                    >
+                      <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-sm">
+                        <ChevronLeft className="w-8 h-8 text-indigo-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-indigo-900 dark:text-indigo-300">جاهز للمساعدة</h3>
+                        <p className="text-indigo-600/70 dark:text-indigo-400/70">اختر أحد الخيارات من القائمة الجانبية للبدء</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* History Drawer */}
+      <AnimatePresence>
+        {showHistory && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowHistory(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
+            />
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-xs bg-white dark:bg-slate-900 z-[70] shadow-2xl flex flex-col transition-colors"
+            >
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  سجل الشروحات
+                </h2>
+                <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {history.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <img 
+                      src={logoUrl} 
+                      alt="" 
+                      className="w-12 h-12 mx-auto mb-2 opacity-20 grayscale object-contain" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    <p>لا يوجد سجل حتى الآن</p>
+                  </div>
+                ) : (
+                  history.map((item) => (
+                    <div 
+                      key={item.id}
+                      className="p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-indigo-300 transition-all group"
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded">
+                          {MODES_CONFIG[item.mode].label}
+                        </span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteFromHistory(item.id);
+                          }}
+                          className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <h4 className="font-bold text-sm mb-1 truncate">{item.title}</h4>
+                      <p className="text-[10px] text-gray-400 mb-2">
+                        {new Date(item.date).toLocaleDateString('ar-EG')} - {new Date(item.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <button 
+                        onClick={() => {
+                          setResponses(prev => ({ ...prev, [item.mode]: item.response }));
+                          setMode(item.mode);
+                          setIsViewingHistory(true);
+                          setFileName(item.title);
+                          setShowHistory(false);
+                        }}
+                        className="w-full py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-100 dark:border-indigo-600 hover:bg-indigo-600 hover:text-white transition-all"
+                      >
+                        عرض الشرح
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+              {history.length > 0 && (
+                <div className="p-4 border-t border-gray-100 dark:border-slate-800">
+                  <button 
+                    onClick={() => {
+                      if (confirm('هل أنت متأكد من مسح السجل بالكامل؟')) {
+                        setHistory([]);
+                      }
+                    }}
+                    className="w-full py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    مسح السجل بالكامل
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Camera Modal */}
+      <AnimatePresence>
+        {isCameraOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center"
+          >
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-10 flex items-center gap-8">
+              <button 
+                onClick={stopCamera}
+                className="w-14 h-14 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-white/30 transition-all"
+              >
+                <X className="w-8 h-8" />
+              </button>
+              <button 
+                onClick={capturePhoto}
+                className="w-20 h-20 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xl"
+              >
+                <div className="w-16 h-16 rounded-full border-2 border-gray-200" />
+              </button>
+              <div className="w-14 h-14" /> {/* Spacer */}
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Footer */}
+      <footer className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
+        <p>© {new Date().getFullYear()} StudyAI - تعلم بذكاء، لا بجهد</p>
+      </footer>
+
+      {/* Splash Screen / Prayer Modal */}
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="w-full max-w-md bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-slate-700/50 rounded-[2.5rem] p-8 shadow-2xl text-center relative overflow-hidden"
+            >
+              {/* Decorative background elements */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
+              
+              <div className="relative z-10 space-y-6">
+                <div className="w-24 h-24 bg-transparent flex items-center justify-center mx-auto transform -rotate-6 overflow-hidden">
+                  <img 
+                    src={logoUrl} 
+                    alt="" 
+                    className="w-full h-full object-contain" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-white text-sm font-bold tracking-widest uppercase opacity-60">مرحباً بك في Revo ESAI</h2>
+                  <div className="h-px w-12 bg-indigo-500 mx-auto" />
+                </div>
+
+                <div className="py-6">
+                  <p className="text-white font-black text-3xl sm:text-4xl leading-tight drop-shadow-sm">
+                    يارب عبدالرحمن المسيري يجيب <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">99</span> ف ثانويه عامه 🤲
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setShowSplash(false)}
+                  className="w-full py-4 bg-white text-indigo-900 rounded-2xl font-black text-lg hover:bg-indigo-50 transition-all shadow-xl active:scale-95"
+                >
+                  اللهم آمين، ابدأ الآن
+                </button>
+                
+                <p className="text-white/40 text-[10px] font-medium">نتمنى لكل الطلاب النجاح والتوفيق</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .prose h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          margin-top: 0;
+          margin-bottom: 1.25rem;
+          padding: 0.85rem 1.1rem;
+          background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+          border-right: 5px solid #4f46e5;
+          border-radius: 0.75rem;
+          color: #312e81;
+          box-shadow: 0 2px 6px rgba(79, 70, 229, 0.08);
+        }
+        .dark .prose h2 {
+          background: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%);
+          border-right-color: #818cf8;
+          color: #e0e7ff;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .prose h3 {
+          font-size: 1.2rem;
+          font-weight: 700;
+          margin-top: 1.5rem;
+          margin-bottom: 0.6rem;
+          color: #4f46e5;
+          padding-right: 0.6rem;
+          border-right: 3px solid #a5b4fc;
+        }
+        .dark .prose h3 {
+          color: #a5b4fc;
+          border-right-color: #4f46e5;
+        }
+        .prose p {
+          margin-top: 0.6rem;
+          margin-bottom: 1rem;
+          line-height: 1.95;
+          font-size: 1.02rem;
+        }
+        .prose hr {
+          margin: 1.75rem 0;
+          border: 0;
+          height: 1px;
+          background: linear-gradient(to left, transparent, #c7d2fe, transparent);
+        }
+        .dark .prose hr {
+          background: linear-gradient(to left, transparent, #3730a3, transparent);
+        }
+        .prose strong {
+          color: #4338ca;
+          font-weight: 700;
+        }
+        .dark .prose strong {
+          color: #c7d2fe;
+        }
+        .prose blockquote {
+          border-right: 4px solid #4f46e5;
+          padding: 1rem 1.5rem;
+          background: #f5f3ff;
+          border-radius: 0.5rem;
+          margin: 1.5rem 0;
+          font-style: italic;
+        }
+        .dark .prose blockquote {
+          background: #1e1b4b;
+          border-right-color: #6366f1;
+        }
+      `}} />
+    </div>
+  );
+}
+
+export default StudyApp;
