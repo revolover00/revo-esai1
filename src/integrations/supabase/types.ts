@@ -14,13 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      redemption_codes: {
+        Row: {
+          code: string
+          created_at: string
+          duration_days: number
+          is_developer: boolean
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          duration_days: number
+          is_developer?: boolean
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          duration_days?: number
+          is_developer?: boolean
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
+      user_usage: {
+        Row: {
+          active_code: string | null
+          created_at: string
+          free_uses_count: number
+          subscription_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_code?: string | null
+          created_at?: string
+          free_uses_count?: number
+          subscription_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_code?: string | null
+          created_at?: string
+          free_uses_count?: number
+          subscription_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      consume_ai_usage: { Args: { _user_id: string }; Returns: Json }
+      redeem_code: { Args: { _code: string; _user_id: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
