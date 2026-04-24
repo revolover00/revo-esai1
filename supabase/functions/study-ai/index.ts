@@ -36,79 +36,36 @@ const SYSTEM_PROMPT = `أنت "Revo ESAI"، مساعد تعليمي ذكي مت�
 
 ⚠️ ممنوع: لصق العنوان الرئيسي مع أول فقرة، أو كتابة الشرح كقائمة طويلة بدون عناوين فرعية، أو إهمال الفواصل \`---\`.`;
 
-// Convert OpenAI-style messages to Gemini format
-function toGeminiContents(messages: any[], images: string[] | undefined) {
-  const contents: any[] = [];
+// GitHub Models API uses OpenAI-compatible format, so we just need to build standard messages.
+// Build OpenAI-style messages with images attached to the last user message.
+function buildOpenAIMessages(messages: any[], images: string[] | undefined) {
+  const out: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
   for (const msg of messages) {
-    const role = msg.role === "assistant" ? "model" : "user";
-    const parts: any[] = [];
-    if (typeof msg.content === "string") {
-      parts.push({ text: msg.content });
-    } else if (Array.isArray(msg.content)) {
-      for (const p of msg.content) {
-        if (p.type === "text") parts.push({ text: p.text });
-      }
-    }
     if (msg.role === "user" && images && images.length > 0 && msg === messages[messages.length - 1]) {
+      const parts: any[] = [{ type: "text", text: typeof msg.content === "string" ? msg.content : "" }];
       for (const img of images) {
-        const m = img.match(/^data:(.+?);base64,(.+)$/);
-        if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+        parts.push({ type: "image_url", image_url: { url: img } });
       }
+      out.push({ role: "user", content: parts });
+    } else {
+      out.push(msg);
     }
-    contents.push({ role, parts });
   }
-  return contents;
+  return out;
 }
 
-// SSE stream from Gemini -> OpenAI-compatible SSE chunks
-function geminiStreamToOpenAISSE(geminiBody: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-  const reader = geminiBody.getReader();
-  const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
-  let buffer = "";
-
-  return new ReadableStream({
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        let idx: number;
-        while ((idx = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (!json) continue;
-          try {
-            const parsed = JSON.parse(json);
-            const text = parsed.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join("") ?? "";
-            if (text) {
-              const chunk = { choices: [{ delta: { content: text } }] };
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-            }
-          } catch { /* partial */ }
-        }
-      } catch (e) {
-        controller.error(e);
-      }
-    },
-  });
-}
-
-async function callGemini(apiKey: string, contents: any[]) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
-  return fetch(url, {
+async function callGitHubModels(apiKey: string, messages: any[]) {
+  return fetch("https://models.github.ai/inference/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Accept: "application/vnd.github+json",
+    },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents,
+      model: "openai/gpt-4o",
+      messages,
+      stream: true,
     }),
   });
 }
