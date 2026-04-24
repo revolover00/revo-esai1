@@ -756,11 +756,15 @@ function StudyApp() {
   const streamFromEdge = async (
     userContent: string,
     onDelta: (text: string) => void,
-    imageDataUrls?: string[]
+    imageDataUrls?: string[],
+    extractedText?: string | null,
   ) => {
     const { data: { session } } = await supabase.auth.getSession();
     const accessToken = session?.access_token;
     if (!accessToken) throw new Error("AUTH_REQUIRED");
+
+    // If we already cached a textual description of the media, send it instead of images.
+    const useExtracted = !!(extractedText && extractedText.trim().length > 0);
 
     const resp = await fetch(STUDY_AI_URL, {
       method: "POST",
@@ -771,7 +775,11 @@ function StudyApp() {
       },
       body: JSON.stringify({
         messages: [{ role: "user", content: userContent }],
-        ...(imageDataUrls && imageDataUrls.length > 0 ? { images: imageDataUrls } : {}),
+        ...(useExtracted
+          ? { extractedText }
+          : imageDataUrls && imageDataUrls.length > 0
+            ? { images: imageDataUrls }
+            : {}),
       }),
     });
 
@@ -813,6 +821,24 @@ function StudyApp() {
         }
       }
     }
+  };
+
+  // Strip the hidden <MEDIA_DESCRIPTION>...</MEDIA_DESCRIPTION> block before showing to user.
+  // Returns { visible, extracted }.
+  const splitMediaDescription = (raw: string): { visible: string; extracted: string | null } => {
+    const closed = raw.match(/<MEDIA_DESCRIPTION>([\s\S]*?)<\/MEDIA_DESCRIPTION>/i);
+    if (closed) {
+      return {
+        visible: raw.replace(closed[0], "").trimStart(),
+        extracted: closed[1].trim(),
+      };
+    }
+    // Stream still in progress: hide everything until tag closes.
+    if (/<MEDIA_DESCRIPTION>/i.test(raw)) {
+      const before = raw.split(/<MEDIA_DESCRIPTION>/i)[0] ?? "";
+      return { visible: before.trimStart(), extracted: null };
+    }
+    return { visible: raw, extracted: null };
   };
 
   const processImage = async (
