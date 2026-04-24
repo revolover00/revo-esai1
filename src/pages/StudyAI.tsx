@@ -928,13 +928,13 @@ function StudyApp() {
 3. ركز على التفاصيل البصرية في كل إطار واربط بينها لتقديم شرح متسلسل ومنطقي.`;
       }
 
-      // Collect all images to send as multimodal content
+      // Collect all images to send as multimodal content (only on FIRST call when we have no cached text yet)
       const allImages: string[] = [];
-      
+
       if (currentImage) {
         allImages.push(currentImage);
       }
-      
+
       if (currentPdfPages.length > 0) {
         allImages.push(...currentPdfPages);
       }
@@ -943,11 +943,28 @@ function StudyApp() {
         allImages.push(...currentVideoFrames);
       }
 
+      // 🔑 Reuse the cached extracted description if we already have one,
+      // so we don't reprocess images on every mode switch / follow-up.
+      const cachedText = extractedMediaText;
+
       let fullText = "";
-      await streamFromEdge(promptText, (delta) => {
-        fullText += delta;
-        setResponses(prev => ({ ...prev, [selectedMode]: fullText }));
-      }, allImages.length > 0 ? allImages : undefined);
+      let pendingExtraction: string | null = null;
+      await streamFromEdge(
+        promptText,
+        (delta) => {
+          fullText += delta;
+          const { visible, extracted } = splitMediaDescription(fullText);
+          if (extracted && !pendingExtraction) pendingExtraction = extracted;
+          setResponses((prev) => ({ ...prev, [selectedMode]: visible }));
+        },
+        allImages.length > 0 ? allImages : undefined,
+        cachedText,
+      );
+
+      // Persist the extracted text once after streaming finishes so future calls use it.
+      if (pendingExtraction && !cachedText) {
+        setExtractedMediaText(pendingExtraction);
+      }
 
     } catch (err: any) {
       console.error(err);
