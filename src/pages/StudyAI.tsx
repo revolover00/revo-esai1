@@ -1698,6 +1698,7 @@ function StudyApp() {
                         setVideoFrames([]);
                         setVideoName(null);
                         setFileName(null);
+                        setExtractedMediaText(null);
                         setResponses({
                           explain: null,
                           simplify: null,
