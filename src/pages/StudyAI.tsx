@@ -403,6 +403,7 @@ function StudyApp() {
         chat: null,
         video: null
       });
+      setExtractedMediaText(null); // new YouTube source → invalidate cached description
       setMode('video');
       setError(null);
       
