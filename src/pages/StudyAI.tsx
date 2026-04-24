@@ -652,6 +652,7 @@ function StudyApp() {
     setVideoFile(null);
     setVideoFrames([]);
     setVideoName(null);
+    setExtractedMediaText(null); // new media → invalidate cached description
 
     if (file.type === 'application/pdf') {
       setLoading(true);
