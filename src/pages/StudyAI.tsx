@@ -1014,21 +1014,35 @@ function StudyApp() {
         [mode]: [...prev[mode], { question, answer: "" }]
       }));
 
-      // Collect images for follow-up context
+      // Collect images for follow-up context (only used if no cached extracted text)
       const allImages: string[] = [];
       if (image) allImages.push(image);
       if (pdfPages.length > 0) allImages.push(...pdfPages);
       if (videoFrames.length > 0) allImages.push(...videoFrames);
 
+      const cachedText = extractedMediaText;
+
       let fullAnswer = "";
-      await streamFromEdge(promptText, (delta) => {
-        fullAnswer += delta;
-        setFollowUps(prev => {
-          const currentFollowUps = [...prev[mode]];
-          currentFollowUps[currentFollowUps.length - 1].answer = fullAnswer;
-          return { ...prev, [mode]: currentFollowUps };
-        });
-      }, allImages.length > 0 ? allImages : undefined);
+      let pendingExtraction: string | null = null;
+      await streamFromEdge(
+        promptText,
+        (delta) => {
+          fullAnswer += delta;
+          const { visible, extracted } = splitMediaDescription(fullAnswer);
+          if (extracted && !pendingExtraction) pendingExtraction = extracted;
+          setFollowUps((prev) => {
+            const currentFollowUps = [...prev[mode]];
+            currentFollowUps[currentFollowUps.length - 1].answer = visible;
+            return { ...prev, [mode]: currentFollowUps };
+          });
+        },
+        allImages.length > 0 ? allImages : undefined,
+        cachedText,
+      );
+
+      if (pendingExtraction && !cachedText) {
+        setExtractedMediaText(pendingExtraction);
+      }
 
     } catch (err: any) {
       console.error("Follow-up Error:", err);
