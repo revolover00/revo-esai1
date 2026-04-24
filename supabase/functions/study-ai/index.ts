@@ -204,7 +204,7 @@ serve(async (req) => {
       );
     }
 
-    const { messages, images } = await req.json();
+    const { messages, images, extractedText } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array is required" }), {
@@ -212,6 +212,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // If we already have an extracted text description, treat this request as text-only.
+    const hasExtracted = typeof extractedText === "string" && extractedText.trim().length > 0;
+    const effectiveImages = hasExtracted ? undefined : images;
 
     // Collect all available GitHub API keys (stored as GEMINI_API_KEY_1..10 from before, plus GITHUB_TOKEN)
     const githubKeys: string[] = [];
@@ -226,14 +230,16 @@ serve(async (req) => {
     const shuffled = [...githubKeys].sort(() => Math.random() - 0.5);
 
     // Build OpenAI-style messages (used for GitHub Models, OpenRouter & Lovable AI)
-    const aiMessages = buildOpenAIMessages(messages, images);
+    const aiMessages = buildOpenAIMessages(messages, effectiveImages, extractedText);
 
     // 1️⃣ FIRST: try GitHub Models API keys with gpt-4o (works for both text and images)
     for (const key of shuffled) {
       try {
         const r = await callGitHubModels(key, aiMessages);
         if (r.ok && r.body) {
-          console.log(`✅ GitHub key #${githubKeys.indexOf(key) + 1} succeeded (gpt-4o)`);
+          console.log(
+            `✅ GitHub key #${githubKeys.indexOf(key) + 1} succeeded (gpt-4o) [${hasExtracted ? "text-cached" : effectiveImages?.length ? "vision" : "text"}]`,
+          );
           return new Response(r.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
           });
@@ -245,7 +251,7 @@ serve(async (req) => {
       }
     }
 
-    const hasImages = Array.isArray(images) && images.length > 0;
+    const hasImages = Array.isArray(effectiveImages) && effectiveImages.length > 0;
 
     // 2️⃣ FALLBACK (text-only): OpenRouter
     if (!hasImages) {
