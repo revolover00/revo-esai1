@@ -156,54 +156,7 @@ serve(async (req) => {
   }
 
   try {
-    // ===== Auth & quota check =====
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    // Verify user from JWT
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "جلسة غير صالحة، سجّل الدخول مرة أخرى." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const userId = userData.user.id;
-
-    // Consume usage with service role
-    const adminClient = createClient(supabaseUrl, serviceKey);
-    const { data: quotaData, error: quotaErr } = await adminClient.rpc("consume_ai_usage", {
-      _user_id: userId,
-    });
-    if (quotaErr) {
-      console.error("consume_ai_usage error:", quotaErr);
-      return new Response(JSON.stringify({ error: "تعذر التحقق من الاستخدام." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!quotaData?.allowed) {
-      return new Response(
-        JSON.stringify({
-          error: "انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.",
-          code: "no_quota",
-        }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
+    // Auth & quota removed — open access
     const { messages, images, extractedText } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
