@@ -35,7 +35,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import * as pdfjsLib from 'pdfjs-dist';
-// Auth removed — direct access
+import { supabase } from '@/integrations/supabase/client';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -731,9 +731,7 @@ function StudyApp() {
     imageDataUrls?: string[],
     extractedText?: string | null,
   ) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
-    if (!accessToken) throw new Error("AUTH_REQUIRED");
+    // Auth removed — open access
 
     // If we already cached a textual description of the media, send it instead of images.
     const useExtracted = !!(extractedText && extractedText.trim().length > 0);
@@ -743,7 +741,7 @@ function StudyApp() {
       headers: {
         "Content-Type": "application/json",
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
       body: JSON.stringify({
         messages: [{ role: "user", content: userContent }],
@@ -934,21 +932,15 @@ function StudyApp() {
 
     } catch (err: any) {
       console.error(err);
-      if (err.message === "AUTH_REQUIRED") {
-        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
-      } else if (err.message === "NO_QUOTA") {
-        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
-        setShowRedeemDialog(true);
-      } else if (err.message === "RATE_LIMIT") {
+      if (err.message === "RATE_LIMIT") {
         setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
       } else if (err.message === "PAYMENT_REQUIRED") {
-        setError('يرجى إضافة رصيد لحساب Lovable AI.');
+        setError('يرجى إضافة رصيد لحساب الذكاء الاصطناعي.');
       } else {
         setError('حدث خطأ أثناء معالجة البيانات. يرجى المحاولة مرة أخرى.');
       }
     } finally {
       setLoading(false);
-      usage.refresh();
     }
   };
 
@@ -1012,21 +1004,15 @@ function StudyApp() {
 
     } catch (err: any) {
       console.error("Follow-up Error:", err);
-      if (err.message === "AUTH_REQUIRED") {
-        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
-      } else if (err.message === "NO_QUOTA") {
-        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
-        setShowRedeemDialog(true);
-      } else if (err.message === "RATE_LIMIT") {
+      if (err.message === "RATE_LIMIT") {
         setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
       } else if (err.message === "PAYMENT_REQUIRED") {
-        setError('يرجى إضافة رصيد لحساب Lovable AI.');
+        setError('يرجى إضافة رصيد لحساب الذكاء الاصطناعي.');
       } else {
         setError(`حدث خطأ أثناء إرسال السؤال: ${(err?.message || '').substring(0, 100)}`);
       }
     } finally {
       setLoadingFollowUp(false);
-      usage.refresh();
     }
   };
 
@@ -1388,29 +1374,6 @@ function StudyApp() {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            {user ? (
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                title="تسجيل الخروج"
-              >
-                {user.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
-                ) : (
-                  <LogOut className="w-5 h-5" />
-                )}
-                <span className="text-sm hidden sm:block">خروج</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleGoogleSignIn}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors shadow-md animate-pulse"
-                title="تسجيل الدخول بجوجل"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>دخول بجوجل</span>
-              </button>
-            )}
             <div className="text-sm text-gray-500 dark:text-slate-300 font-medium hidden sm:block">مساعدك التعليمي الذكي</div>
           </div>
         </div>
