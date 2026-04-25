@@ -1384,9 +1384,6 @@ function StudyApp() {
   if (!authChecked) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   }
-  if (!user) {
-    return <AuthGate />;
-  }
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
