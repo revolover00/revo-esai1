@@ -35,13 +35,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import * as pdfjsLib from 'pdfjs-dist';
-import { LogIn, LogOut, Ticket } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable';
-import type { User } from '@supabase/supabase-js';
-import { AuthGate } from '@/components/AuthGate';
-import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
-import { useUsage } from '@/hooks/useUsage';
+// Auth removed — direct access
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -327,31 +321,7 @@ function StudyApp() {
   const [youtubeInput, setYoutubeInput] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
-  const usage = useUsage(user?.id);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAuthChecked(true);
-    });
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthChecked(true);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleGoogleSignIn = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-    if (result.error) console.error('Google sign-in error:', result.error);
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+  // Auth removed — open access for all users
 
   useEffect(() => {
     if (darkMode) {
@@ -862,12 +832,6 @@ function StudyApp() {
     const currentVideoFrames = mediaOverrides?.videoFrames ?? videoFrames;
 
     if (!currentImage && !currentPdfText && !youtubeUrl && !currentVideoFile) return;
-
-    if (!user) {
-      setError('يجب تسجيل الدخول بحساب جوجل أولاً لاستخدام هذه الميزة. اضغط على زر "دخول بجوجل" في الأعلى.');
-      setLoading(false);
-      return;
-    }
 
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
@@ -1381,16 +1345,8 @@ function StudyApp() {
     }
   };
 
-  if (!authChecked) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  }
-  if (!user) {
-    return <AuthGate />;
-  }
-
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
-      <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -1407,21 +1363,6 @@ function StudyApp() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Revo ESAI</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Usage / Subscription badge */}
-            <button
-              onClick={() => setShowRedeemDialog(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
-              title="تفعيل كود اشتراك"
-            >
-              <Ticket className="w-4 h-4" />
-              {usage.hasActiveSubscription ? (
-                <span className="hidden sm:inline">
-                  ينتهي {new Date(usage.subscriptionExpiresAt!).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
-                </span>
-              ) : (
-                <span>متبقي {usage.freeRemaining}/4</span>
-              )}
-            </button>
             <button 
               onClick={() => setShowHistory(!showHistory)}
               className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors relative"
