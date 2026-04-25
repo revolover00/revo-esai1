@@ -35,7 +35,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import * as pdfjsLib from 'pdfjs-dist';
+import { LogIn, LogOut, Ticket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { lovable } from '@/integrations/lovable';
+import type { User } from '@supabase/supabase-js';
+import { AuthGate } from '@/components/AuthGate';
+import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
+import { useUsage } from '@/hooks/useUsage';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -321,7 +327,31 @@ function StudyApp() {
   const [youtubeInput, setYoutubeInput] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Auth removed — open access for all users
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const usage = useUsage(user?.id);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
+    if (result.error) console.error('Google sign-in error:', result.error);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   useEffect(() => {
     if (darkMode) {
@@ -731,7 +761,9 @@ function StudyApp() {
     imageDataUrls?: string[],
     extractedText?: string | null,
   ) => {
-    // Auth removed — open access
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) throw new Error("AUTH_REQUIRED");
 
     // If we already cached a textual description of the media, send it instead of images.
     const useExtracted = !!(extractedText && extractedText.trim().length > 0);
@@ -741,7 +773,7 @@ function StudyApp() {
       headers: {
         "Content-Type": "application/json",
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         messages: [{ role: "user", content: userContent }],
@@ -830,6 +862,12 @@ function StudyApp() {
     const currentVideoFrames = mediaOverrides?.videoFrames ?? videoFrames;
 
     if (!currentImage && !currentPdfText && !youtubeUrl && !currentVideoFile) return;
+
+    if (!user) {
+      setError('يجب تسجيل الدخول بحساب جوجل أولاً لاستخدام هذه الميزة. اضغط على زر "دخول بجوجل" في الأعلى.');
+      setLoading(false);
+      return;
+    }
 
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
@@ -932,15 +970,21 @@ function StudyApp() {
 
     } catch (err: any) {
       console.error(err);
-      if (err.message === "RATE_LIMIT") {
+      if (err.message === "AUTH_REQUIRED") {
+        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
+      } else if (err.message === "NO_QUOTA") {
+        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
+        setShowRedeemDialog(true);
+      } else if (err.message === "RATE_LIMIT") {
         setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
       } else if (err.message === "PAYMENT_REQUIRED") {
-        setError('يرجى إضافة رصيد لحساب الذكاء الاصطناعي.');
+        setError('يرجى إضافة رصيد لحساب Lovable AI.');
       } else {
         setError('حدث خطأ أثناء معالجة البيانات. يرجى المحاولة مرة أخرى.');
       }
     } finally {
       setLoading(false);
+      usage.refresh();
     }
   };
 
@@ -1004,15 +1048,21 @@ function StudyApp() {
 
     } catch (err: any) {
       console.error("Follow-up Error:", err);
-      if (err.message === "RATE_LIMIT") {
+      if (err.message === "AUTH_REQUIRED") {
+        setError('يجب تسجيل الدخول لاستخدام الذكاء الاصطناعي.');
+      } else if (err.message === "NO_QUOTA") {
+        setError('انتهت محاولاتك المجانية. أدخل كود تفعيل للمتابعة.');
+        setShowRedeemDialog(true);
+      } else if (err.message === "RATE_LIMIT") {
         setError('عذراً، تم الوصول للحد الأقصى من الطلبات. يرجى المحاولة لاحقاً.');
       } else if (err.message === "PAYMENT_REQUIRED") {
-        setError('يرجى إضافة رصيد لحساب الذكاء الاصطناعي.');
+        setError('يرجى إضافة رصيد لحساب Lovable AI.');
       } else {
         setError(`حدث خطأ أثناء إرسال السؤال: ${(err?.message || '').substring(0, 100)}`);
       }
     } finally {
       setLoadingFollowUp(false);
+      usage.refresh();
     }
   };
 
@@ -1331,8 +1381,16 @@ function StudyApp() {
     }
   };
 
+  if (!authChecked) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  }
+  if (!user) {
+    return <AuthGate />;
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
+      <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -1349,6 +1407,21 @@ function StudyApp() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Revo ESAI</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Usage / Subscription badge */}
+            <button
+              onClick={() => setShowRedeemDialog(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+              title="تفعيل كود اشتراك"
+            >
+              <Ticket className="w-4 h-4" />
+              {usage.hasActiveSubscription ? (
+                <span className="hidden sm:inline">
+                  ينتهي {new Date(usage.subscriptionExpiresAt!).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+                </span>
+              ) : (
+                <span>متبقي {usage.freeRemaining}/4</span>
+              )}
+            </button>
             <button 
               onClick={() => setShowHistory(!showHistory)}
               className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors relative"
@@ -1374,6 +1447,29 @@ function StudyApp() {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
+            {user ? (
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                title="تسجيل الخروج"
+              >
+                {user.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
+                ) : (
+                  <LogOut className="w-5 h-5" />
+                )}
+                <span className="text-sm hidden sm:block">خروج</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleGoogleSignIn}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors shadow-md animate-pulse"
+                title="تسجيل الدخول بجوجل"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>دخول بجوجل</span>
+              </button>
+            )}
             <div className="text-sm text-gray-500 dark:text-slate-300 font-medium hidden sm:block">مساعدك التعليمي الذكي</div>
           </div>
         </div>
