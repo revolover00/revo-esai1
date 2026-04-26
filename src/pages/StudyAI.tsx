@@ -1898,6 +1898,9 @@ function StudyApp() {
                               setIsSpeaking(false);
                               if (mode === 'chat') {
                                 setResponses(prev => ({ ...prev, chat: null }));
+                              } else if (mode === 'mindmap') {
+                                // Re-open style picker so user can switch the visual style
+                                setShowStylePicker(true);
                               } else if (mode) {
                                 processImage(mode, true);
                               }
