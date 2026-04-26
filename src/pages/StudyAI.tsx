@@ -42,6 +42,8 @@ import type { User } from '@supabase/supabase-js';
 import { AuthGate } from '@/components/AuthGate';
 import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
 import { useUsage } from '@/hooks/useUsage';
+import { MindMapStylePicker, type MindMapStyle } from '@/components/MindMapStylePicker';
+import { CreativeMindMap, NotesMindMap, BusinessMindMap } from '@/components/MindMapRenderers';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -162,6 +164,9 @@ function StudyApp() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [showQuizResults, setShowQuizResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mind map style state — user picks a visual style before generating
+  const [mindMapStyle, setMindMapStyle] = useState<MindMapStyle>('modern');
+  const [showStylePicker, setShowStylePicker] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1074,6 +1079,12 @@ function StudyApp() {
       const jsonStr = jsonMatch[0];
       const json: MindMapData = JSON.parse(jsonStr);
 
+      // Render based on user-selected style
+      if (mindMapStyle === 'creative') return <CreativeMindMap data={json} />;
+      if (mindMapStyle === 'notes') return <NotesMindMap data={json} />;
+      if (mindMapStyle === 'business') return <BusinessMindMap data={json} />;
+      // fallthrough → modern (default existing layout below)
+
       return (
         <div className="relative py-16 px-4 overflow-hidden bg-white dark:bg-slate-900 rounded-3xl transition-colors">
           {/* SVG Definitions for Arrows and Gradients */}
@@ -1388,6 +1399,15 @@ function StudyApp() {
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
       <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
+      <MindMapStylePicker
+        open={showStylePicker}
+        onClose={() => setShowStylePicker(false)}
+        onSelect={(style) => {
+          setMindMapStyle(style);
+          // generate the mind map after the user has picked a style
+          processImage('mindmap', true);
+        }}
+      />
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -1731,6 +1751,11 @@ function StudyApp() {
                           onClick={() => {
                             window.speechSynthesis.cancel();
                             setIsSpeaking(false);
+                            // For mind map: open style picker first (only when generating fresh)
+                            if (m === 'mindmap' && !responses.mindmap) {
+                              setShowStylePicker(true);
+                              return;
+                            }
                             processImage(m);
                           }}
                           className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all border-2 ${
@@ -1873,6 +1898,9 @@ function StudyApp() {
                               setIsSpeaking(false);
                               if (mode === 'chat') {
                                 setResponses(prev => ({ ...prev, chat: null }));
+                              } else if (mode === 'mindmap') {
+                                // Re-open style picker so user can switch the visual style
+                                setShowStylePicker(true);
                               } else if (mode) {
                                 processImage(mode, true);
                               }
