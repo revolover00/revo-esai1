@@ -382,7 +382,30 @@ serve(async (req) => {
     // Build OpenAI-style messages (used for GitHub Models, OpenRouter & Lovable AI)
     const aiMessages = buildOpenAIMessages(messages, effectiveImages, extractedText);
 
-    // 1️⃣ FIRST: try GitHub Models API keys with gpt-4o (works for both text and images)
+    // 0️⃣ FIRST: try Google Gemini direct (gemini-2.0-flash) with the user's hardcoded keys.
+    // Rotate on rate-limit / quota errors; fall through to GitHub when all are exhausted.
+    const geminiOrder = [...GEMINI_DIRECT_KEYS].sort(() => Math.random() - 0.5);
+    for (const key of geminiOrder) {
+      try {
+        const r = await callGeminiDirect(key, aiMessages);
+        if (r && r.ok && r.body) {
+          console.log(
+            `✅ Gemini direct key #${GEMINI_DIRECT_KEYS.indexOf(key) + 1} succeeded (gemini-2.0-flash) [${hasExtracted ? "text-cached" : effectiveImages?.length ? "vision" : "text"}]`,
+          );
+          return r;
+        }
+        const status = r?.status ?? 0;
+        const errTxt = r ? await r.text().catch(() => "") : "";
+        console.warn(
+          `⚠️ Gemini direct key #${GEMINI_DIRECT_KEYS.indexOf(key) + 1} failed: ${status} ${errTxt.slice(0, 200)}`,
+        );
+        // 429 / 403 (quota) → just continue to next key. Any other status also continues.
+      } catch (e) {
+        console.warn(`⚠️ Gemini direct key #${GEMINI_DIRECT_KEYS.indexOf(key) + 1} threw:`, e);
+      }
+    }
+
+    // 1️⃣ SECOND: try GitHub Models API keys with gpt-4o (works for both text and images)
     for (const key of shuffled) {
       try {
         const r = await callGitHubModels(key, aiMessages);
