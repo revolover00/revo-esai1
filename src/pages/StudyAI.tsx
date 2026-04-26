@@ -164,6 +164,9 @@ function StudyApp() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [showQuizResults, setShowQuizResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mind map style state — user picks a visual style before generating
+  const [mindMapStyle, setMindMapStyle] = useState<MindMapStyle>('modern');
+  const [showStylePicker, setShowStylePicker] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
