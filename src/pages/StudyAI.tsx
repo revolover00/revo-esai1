@@ -1079,6 +1079,12 @@ function StudyApp() {
       const jsonStr = jsonMatch[0];
       const json: MindMapData = JSON.parse(jsonStr);
 
+      // Render based on user-selected style
+      if (mindMapStyle === 'creative') return <CreativeMindMap data={json} />;
+      if (mindMapStyle === 'notes') return <NotesMindMap data={json} />;
+      if (mindMapStyle === 'business') return <BusinessMindMap data={json} />;
+      // fallthrough → modern (default existing layout below)
+
       return (
         <div className="relative py-16 px-4 overflow-hidden bg-white dark:bg-slate-900 rounded-3xl transition-colors">
           {/* SVG Definitions for Arrows and Gradients */}
