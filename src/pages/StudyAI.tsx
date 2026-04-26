@@ -1399,6 +1399,15 @@ function StudyApp() {
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
       <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
+      <MindMapStylePicker
+        open={showStylePicker}
+        onClose={() => setShowStylePicker(false)}
+        onSelect={(style) => {
+          setMindMapStyle(style);
+          // generate the mind map after the user has picked a style
+          processImage('mindmap', true);
+        }}
+      />
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
