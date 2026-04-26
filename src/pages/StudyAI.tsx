@@ -1742,6 +1742,11 @@ function StudyApp() {
                           onClick={() => {
                             window.speechSynthesis.cancel();
                             setIsSpeaking(false);
+                            // For mind map: open style picker first (only when generating fresh)
+                            if (m === 'mindmap' && !responses.mindmap) {
+                              setShowStylePicker(true);
+                              return;
+                            }
                             processImage(m);
                           }}
                           className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all border-2 ${
