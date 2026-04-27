@@ -13,10 +13,14 @@ import {
   BookOpen,
   X,
   MessageSquare,
+  Mic,
+  Trash,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const STUDY_AI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/study-ai`;
+const VOICE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-transcribe`;
 
 interface ChatMessage {
   role: 'user' | 'assistant';
