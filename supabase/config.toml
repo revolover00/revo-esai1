@@ -1,1 +1,4 @@
 project_id = "rgoolqnygckruvhhymht"
+
+[functions.voice-transcribe]
+verify_jwt = false
