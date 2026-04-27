@@ -44,6 +44,7 @@ import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
 import { useUsage } from '@/hooks/useUsage';
 import { MindMapStylePicker, type MindMapStyle } from '@/components/MindMapStylePicker';
 import { CreativeMindMap, NotesMindMap, BusinessMindMap } from '@/components/MindMapRenderers';
+import { AIChatAssistant } from '@/components/AIChatAssistant';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
