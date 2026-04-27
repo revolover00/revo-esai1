@@ -143,6 +143,168 @@ export function AIChatAssistant({ onClose }: Props) {
     setLoading(false);
   };
 
+  // ===================== Voice recording =====================
+  const cleanupRecording = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    rafRef.current = null;
+    recordTimerRef.current = null;
+    audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+    audioStreamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+    }
+    audioCtxRef.current = null;
+    analyserRef.current = null;
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setAudioLevels(Array(24).fill(4));
+    setRecordSeconds(0);
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onloadend = () => {
+        const result = r.result as string;
+        const idx = result.indexOf('base64,');
+        resolve(idx >= 0 ? result.slice(idx + 7) : result);
+      };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+
+  const startRecording = async () => {
+    if (loading || isRecording || isTranscribing) return;
+    setError(null);
+    cancelledRef.current = false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      audioStreamRef.current = stream;
+
+      // Pick best supported mime
+      const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ];
+      const mimeType =
+        candidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || '';
+
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = rec;
+      audioChunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        const chunks = audioChunksRef.current;
+        const usedMime = rec.mimeType || mimeType || 'audio/webm';
+        cleanupRecording();
+        setIsRecording(false);
+
+        if (cancelledRef.current || chunks.length === 0) return;
+        const blob = new Blob(chunks, { type: usedMime });
+        if (blob.size < 1000) {
+          setError('التسجيل قصير جداً، تحدث لمدة أطول.');
+          return;
+        }
+
+        setIsTranscribing(true);
+        try {
+          const base64 = await blobToBase64(blob);
+          const { data: { session } } = await supabase.auth.getSession();
+          const accessToken = session?.access_token;
+          const resp = await fetch(VOICE_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({ audio: base64, mimeType: usedMime }),
+          });
+          const json = await resp.json().catch(() => ({}));
+          if (!resp.ok || !json.text) {
+            throw new Error(json.error || 'تعذر تفريغ الصوت');
+          }
+          // Auto-send the transcribed message
+          await sendMessage(json.text);
+        } catch (e: any) {
+          setError(e?.message || 'خطأ أثناء تفريغ الصوت');
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      // Set up audio analyser for waveform
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(data);
+        const bars = 24;
+        const step = Math.floor(data.length / bars);
+        const next: number[] = [];
+        for (let i = 0; i < bars; i++) {
+          let sum = 0;
+          for (let j = 0; j < step; j++) sum += data[i * step + j];
+          const avg = sum / step;
+          next.push(Math.max(4, Math.min(40, (avg / 255) * 40)));
+        }
+        setAudioLevels(next);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordSeconds((s) => {
+          if (s >= 119) {
+            // auto-stop at 2 minutes
+            stopRecording(false);
+            return s;
+          }
+          return s + 1;
+        });
+      }, 1000);
+
+      rec.start(250);
+      setIsRecording(true);
+    } catch (e: any) {
+      cleanupRecording();
+      setError(
+        e?.name === 'NotAllowedError'
+          ? 'يجب السماح باستخدام المايكروفون.'
+          : 'تعذر بدء التسجيل.',
+      );
+    }
+  };
+
+  const stopRecording = (cancelIt: boolean) => {
+    cancelledRef.current = cancelIt;
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.stop(); } catch {}
+    } else {
+      cleanupRecording();
+      setIsRecording(false);
+    }
+  };
+
+  const formatRecTime = (s: number) =>
+    `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+
   const sendMessage = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || loading) return;
