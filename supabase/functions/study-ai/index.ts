@@ -96,7 +96,7 @@ function buildOpenAIMessages(
 ) {
   // If we already have an extracted text description from a previous call,
   // inject it as system context and IGNORE images entirely (saves tokens & enables text-only models).
-  let systemContent = SYSTEM_PROMPT;
+  let systemContent = chatOnly ? CHAT_SYSTEM_PROMPT : SYSTEM_PROMPT;
   const hasImages = Array.isArray(images) && images.length > 0;
   const hasExtracted = typeof extractedText === "string" && extractedText.trim().length > 0;
 
