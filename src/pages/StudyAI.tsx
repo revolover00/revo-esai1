@@ -1400,6 +1400,11 @@ function StudyApp() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
+      <AnimatePresence>
+        {showChatAssistant && (
+          <AIChatAssistant onClose={() => setShowChatAssistant(false)} />
+        )}
+      </AnimatePresence>
       <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
       <MindMapStylePicker
         open={showStylePicker}
