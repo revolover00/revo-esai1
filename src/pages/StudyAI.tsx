@@ -28,7 +28,8 @@ import {
   Link as LinkIcon,
   Download,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Sparkles
 } from 'lucide-react';
 import logoImage from '@/assets/logo.png';
 import { motion, AnimatePresence } from 'motion/react';
