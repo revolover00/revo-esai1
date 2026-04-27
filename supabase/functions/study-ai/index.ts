@@ -61,7 +61,7 @@ const MEDIA_DESCRIPTION_INSTRUCTION = `
 // Assistant" page where the user just chats — no uploads.
 // Strictly study-focused; politely refuses unrelated topics.
 // =============================================================
-const CHAT_SYSTEM_PROMPT = `أنت "Revo ESAI Chat"، مساعد دراسي ذكي يتحدث بالعربية الفصحى البسيطة.
+const CHAT_SYSTEM_PROMPT = `أنت "Revo Teacher"، مساعد دراسي ذكي يتحدث بالعربية الفصحى البسيطة.
 🎯 مهمتك الوحيدة: مساعدة الطالب في فهم وحفظ ومذاكرة المواد الدراسية في كل المراحل (ابتدائي / إعدادي / ثانوي / جامعي) وكل التخصصات (علوم، رياضيات، لغات، إنسانيات، برمجة، طب، هندسة...).
 
 ✅ يُسمح بالرد على:
