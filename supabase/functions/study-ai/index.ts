@@ -479,22 +479,41 @@ serve(async (req) => {
 
     const hasImages = Array.isArray(effectiveImages) && effectiveImages.length > 0;
 
-    // 2️⃣ FALLBACK (text-only): OpenRouter
-    if (!hasImages) {
+    // 2️⃣ FALLBACK: OpenRouter — try the 6 hardcoded keys in random order first
+    //    (Nemotron Nano 12B VL is multimodal → works with text & images)
+    const orOrder = [...OPENROUTER_DIRECT_KEYS].sort(() => Math.random() - 0.5);
+    for (const key of orOrder) {
       try {
-        const orResp = await callOpenRouter(aiMessages);
-        if (orResp && orResp.ok && orResp.body) {
-          console.log("✅ OpenRouter succeeded as fallback [text-only]");
-          return new Response(orResp.body, {
+        const r = await callOpenRouterWithKey(key, aiMessages);
+        if (r.ok && r.body) {
+          console.log(
+            `✅ OpenRouter direct key #${OPENROUTER_DIRECT_KEYS.indexOf(key) + 1} succeeded (nemotron-nano-12b-v2-vl) [${hasExtracted ? "text-cached" : hasImages ? "vision" : "text"}]`,
+          );
+          return new Response(r.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
           });
         }
-        if (orResp) console.warn(`⚠️ OpenRouter failed: ${orResp.status}`);
+        const errTxt = await r.text().catch(() => "");
+        console.warn(
+          `⚠️ OpenRouter direct key #${OPENROUTER_DIRECT_KEYS.indexOf(key) + 1} failed: ${r.status} ${errTxt.slice(0, 200)}`,
+        );
       } catch (e) {
-        console.warn("⚠️ OpenRouter threw:", e);
+        console.warn(`⚠️ OpenRouter direct key #${OPENROUTER_DIRECT_KEYS.indexOf(key) + 1} threw:`, e);
       }
-    } else {
-      console.log("🖼️ Images detected → skipping OpenRouter fallback");
+    }
+
+    // 2.5️⃣ Then try the env OPENROUTER_API_KEY (if any) as extra cushion
+    try {
+      const orResp = await callOpenRouter(aiMessages);
+      if (orResp && orResp.ok && orResp.body) {
+        console.log("✅ OpenRouter (env key) succeeded as fallback");
+        return new Response(orResp.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+      if (orResp) console.warn(`⚠️ OpenRouter env key failed: ${orResp.status}`);
+    } catch (e) {
+      console.warn("⚠️ OpenRouter env key threw:", e);
     }
 
     // 3️⃣ LAST RESORT: Lovable AI Gateway
