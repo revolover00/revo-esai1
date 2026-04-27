@@ -398,7 +398,7 @@ export function AIChatAssistant({ onClose }: Props) {
               </motion.div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  أهلاً! أنا مساعدك الدراسي 📚
+                  أهلاً! أنا Revo Teacher — معلمك الذكي 📚
                 </h2>
                 <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto">
                   اسألني أي شيء عن دروسك، تمارينك، أو طرق المذاكرة. لست بحاجة لرفع أي ملف.
