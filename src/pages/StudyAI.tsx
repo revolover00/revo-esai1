@@ -28,7 +28,8 @@ import {
   Link as LinkIcon,
   Download,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Sparkles
 } from 'lucide-react';
 import logoImage from '@/assets/logo.png';
 import { motion, AnimatePresence } from 'motion/react';
@@ -44,6 +45,7 @@ import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
 import { useUsage } from '@/hooks/useUsage';
 import { MindMapStylePicker, type MindMapStyle } from '@/components/MindMapStylePicker';
 import { CreativeMindMap, NotesMindMap, BusinessMindMap } from '@/components/MindMapRenderers';
+import { AIChatAssistant } from '@/components/AIChatAssistant';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -167,6 +169,7 @@ function StudyApp() {
   // Mind map style state — user picks a visual style before generating
   const [mindMapStyle, setMindMapStyle] = useState<MindMapStyle>('modern');
   const [showStylePicker, setShowStylePicker] = useState(false);
+  const [showChatAssistant, setShowChatAssistant] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1398,6 +1401,11 @@ function StudyApp() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
+      <AnimatePresence>
+        {showChatAssistant && (
+          <AIChatAssistant onClose={() => setShowChatAssistant(false)} />
+        )}
+      </AnimatePresence>
       <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
       <MindMapStylePicker
         open={showStylePicker}
@@ -1438,6 +1446,14 @@ function StudyApp() {
               ) : (
                 <span>متبقي {usage.freeRemaining}/4</span>
               )}
+            </button>
+            <button
+              onClick={() => setShowChatAssistant(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-bold transition-all shadow-md shadow-purple-500/20"
+              title="المساعد الذكي - دردشة بدون ملفات"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">مساعد ذكي</span>
             </button>
             <button 
               onClick={() => setShowHistory(!showHistory)}
@@ -1565,6 +1581,23 @@ function StudyApp() {
                       تحليل الفيديو
                     </button>
                   </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+                    <span className="text-[11px] text-gray-400 font-medium">أو</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+                  </div>
+
+                  {/* Open AI Chat Assistant (no upload needed) */}
+                  <button
+                    onClick={() => setShowChatAssistant(true)}
+                    className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 flex items-center justify-center gap-3 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                    <Sparkles className="w-5 h-5 relative z-10" />
+                    <span className="relative z-10">تحدث مع المساعد الذكي بدون رفع ملفات</span>
+                  </button>
                 </div>
               </>
             )}
