@@ -259,7 +259,7 @@ export function AIChatAssistant({ onClose }: Props) {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                المساعد الذكي
+                Revo Teacher
               </h1>
               <p className="text-[10px] text-gray-500 dark:text-slate-400">
                 دردشة دراسية بدون رفع ملفات
@@ -500,7 +500,7 @@ export function AIChatAssistant({ onClose }: Props) {
             </button>
           </div>
           <p className="text-[10px] text-gray-400 text-center mt-2">
-            المساعد الذكي مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
+            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
           </p>
         </div>
       </footer>

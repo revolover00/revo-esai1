@@ -1450,10 +1450,10 @@ function StudyApp() {
             <button
               onClick={() => setShowChatAssistant(true)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-bold transition-all shadow-md shadow-purple-500/20"
-              title="المساعد الذكي - دردشة بدون ملفات"
+              title="Revo Teacher - دردشة دراسية بدون ملفات"
             >
               <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:inline">مساعد ذكي</span>
+              <span className="hidden sm:inline">Revo Teacher</span>
             </button>
             <button 
               onClick={() => setShowHistory(!showHistory)}
@@ -1596,7 +1596,7 @@ function StudyApp() {
                   >
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
                     <Sparkles className="w-5 h-5 relative z-10" />
-                    <span className="relative z-10">تحدث مع المساعد الذكي بدون رفع ملفات</span>
+                    <span className="relative z-10">تحدث مع Revo Teacher بدون رفع ملفات</span>
                   </button>
                 </div>
               </>
