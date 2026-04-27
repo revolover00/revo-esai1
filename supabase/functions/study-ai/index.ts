@@ -385,7 +385,7 @@ serve(async (req) => {
       );
     }
 
-    const { messages, images, extractedText } = await req.json();
+    const { messages, images, extractedText, chatOnly } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array is required" }), {
@@ -411,7 +411,7 @@ serve(async (req) => {
     const shuffled = [...githubKeys].sort(() => Math.random() - 0.5);
 
     // Build OpenAI-style messages (used for GitHub Models, OpenRouter & Lovable AI)
-    const aiMessages = buildOpenAIMessages(messages, effectiveImages, extractedText);
+    const aiMessages = buildOpenAIMessages(messages, effectiveImages, extractedText, !!chatOnly);
 
     // 0️⃣ FIRST: try Google Gemini direct (gemini-2.0-flash) with the user's hardcoded keys.
     // Rotate on rate-limit / quota errors; fall through to GitHub when all are exhausted.
