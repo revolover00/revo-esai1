@@ -1572,6 +1572,23 @@ function StudyApp() {
                       تحليل الفيديو
                     </button>
                   </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+                    <span className="text-[11px] text-gray-400 font-medium">أو</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+                  </div>
+
+                  {/* Open AI Chat Assistant (no upload needed) */}
+                  <button
+                    onClick={() => setShowChatAssistant(true)}
+                    className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 flex items-center justify-center gap-3 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                    <Sparkles className="w-5 h-5 relative z-10" />
+                    <span className="relative z-10">تحدث مع المساعد الذكي بدون رفع ملفات</span>
+                  </button>
                 </div>
               </>
             )}
