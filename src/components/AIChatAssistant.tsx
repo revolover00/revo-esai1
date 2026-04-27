@@ -64,6 +64,20 @@ export function AIChatAssistant({ onClose }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [audioLevels, setAudioLevels] = useState<number[]>(Array(24).fill(4));
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const recordTimerRef = useRef<number | null>(null);
+  const cancelledRef = useRef(false);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   }, [sessions]);
