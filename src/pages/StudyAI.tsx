@@ -1447,6 +1447,14 @@ function StudyApp() {
                 <span>متبقي {usage.freeRemaining}/4</span>
               )}
             </button>
+            <button
+              onClick={() => setShowChatAssistant(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-bold transition-all shadow-md shadow-purple-500/20"
+              title="المساعد الذكي - دردشة بدون ملفات"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">مساعد ذكي</span>
+            </button>
             <button 
               onClick={() => setShowHistory(!showHistory)}
               className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors relative"
