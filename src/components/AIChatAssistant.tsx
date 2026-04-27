@@ -13,10 +13,14 @@ import {
   BookOpen,
   X,
   MessageSquare,
+  Mic,
+  Trash,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const STUDY_AI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/study-ai`;
+const VOICE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-transcribe`;
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -59,6 +63,20 @@ export function AIChatAssistant({ onClose }: Props) {
   const [showHistory, setShowHistory] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [audioLevels, setAudioLevels] = useState<number[]>(Array(24).fill(4));
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const recordTimerRef = useRef<number | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
@@ -124,6 +142,168 @@ export function AIChatAssistant({ onClose }: Props) {
     abortRef.current = null;
     setLoading(false);
   };
+
+  // ===================== Voice recording =====================
+  const cleanupRecording = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    rafRef.current = null;
+    recordTimerRef.current = null;
+    audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+    audioStreamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+    }
+    audioCtxRef.current = null;
+    analyserRef.current = null;
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setAudioLevels(Array(24).fill(4));
+    setRecordSeconds(0);
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onloadend = () => {
+        const result = r.result as string;
+        const idx = result.indexOf('base64,');
+        resolve(idx >= 0 ? result.slice(idx + 7) : result);
+      };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+
+  const startRecording = async () => {
+    if (loading || isRecording || isTranscribing) return;
+    setError(null);
+    cancelledRef.current = false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      audioStreamRef.current = stream;
+
+      // Pick best supported mime
+      const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ];
+      const mimeType =
+        candidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || '';
+
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = rec;
+      audioChunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        const chunks = audioChunksRef.current;
+        const usedMime = rec.mimeType || mimeType || 'audio/webm';
+        cleanupRecording();
+        setIsRecording(false);
+
+        if (cancelledRef.current || chunks.length === 0) return;
+        const blob = new Blob(chunks, { type: usedMime });
+        if (blob.size < 1000) {
+          setError('التسجيل قصير جداً، تحدث لمدة أطول.');
+          return;
+        }
+
+        setIsTranscribing(true);
+        try {
+          const base64 = await blobToBase64(blob);
+          const { data: { session } } = await supabase.auth.getSession();
+          const accessToken = session?.access_token;
+          const resp = await fetch(VOICE_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({ audio: base64, mimeType: usedMime }),
+          });
+          const json = await resp.json().catch(() => ({}));
+          if (!resp.ok || !json.text) {
+            throw new Error(json.error || 'تعذر تفريغ الصوت');
+          }
+          // Auto-send the transcribed message
+          await sendMessage(json.text);
+        } catch (e: any) {
+          setError(e?.message || 'خطأ أثناء تفريغ الصوت');
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      // Set up audio analyser for waveform
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(data);
+        const bars = 24;
+        const step = Math.floor(data.length / bars);
+        const next: number[] = [];
+        for (let i = 0; i < bars; i++) {
+          let sum = 0;
+          for (let j = 0; j < step; j++) sum += data[i * step + j];
+          const avg = sum / step;
+          next.push(Math.max(4, Math.min(40, (avg / 255) * 40)));
+        }
+        setAudioLevels(next);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordSeconds((s) => {
+          if (s >= 119) {
+            // auto-stop at 2 minutes
+            stopRecording(false);
+            return s;
+          }
+          return s + 1;
+        });
+      }, 1000);
+
+      rec.start(250);
+      setIsRecording(true);
+    } catch (e: any) {
+      cleanupRecording();
+      setError(
+        e?.name === 'NotAllowedError'
+          ? 'يجب السماح باستخدام المايكروفون.'
+          : 'تعذر بدء التسجيل.',
+      );
+    }
+  };
+
+  const stopRecording = (cancelIt: boolean) => {
+    cancelledRef.current = cancelIt;
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.stop(); } catch {}
+    } else {
+      cleanupRecording();
+      setIsRecording(false);
+    }
+  };
+
+  const formatRecTime = (s: number) =>
+    `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
 
   const sendMessage = async (text?: string) => {
     const content = (text ?? input).trim();
@@ -474,39 +654,124 @@ export function AIChatAssistant({ onClose }: Props) {
               </button>
             </div>
           )}
-          <div className="relative flex items-end gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              rows={1}
-              placeholder="اكتب سؤالك الدراسي هنا..."
-              disabled={loading}
-              className="flex-1 bg-transparent px-4 py-3 outline-none resize-none text-sm dark:text-white placeholder:text-gray-400 max-h-32"
-              style={{ direction: 'rtl' }}
-            />
-            <button
-              onClick={() => sendMessage()}
-              disabled={loading || !input.trim()}
-              className="m-1.5 p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-500/20 shrink-0"
-              title="إرسال"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          </div>
+
+          <AnimatePresence mode="wait">
+            {isRecording ? (
+              <motion.div
+                key="recording"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="relative flex items-center gap-3 bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40 border border-rose-300/60 dark:border-rose-700/50 rounded-2xl p-3 shadow-lg shadow-rose-500/10"
+              >
+                <button
+                  onClick={() => stopRecording(true)}
+                  className="shrink-0 w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
+                  title="إلغاء"
+                >
+                  <Trash className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <motion.span
+                    animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                    className="w-2.5 h-2.5 rounded-full bg-red-500"
+                  />
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                    {formatRecTime(recordSeconds)}
+                  </span>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center gap-[3px] h-10 overflow-hidden">
+                  {audioLevels.map((h, i) => (
+                    <motion.span
+                      key={i}
+                      className="w-1 rounded-full bg-gradient-to-t from-rose-500 to-pink-400"
+                      animate={{ height: h }}
+                      transition={{ type: 'spring', damping: 15, stiffness: 200 }}
+                      style={{ height: 4 }}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => stopRecording(false)}
+                  className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 hover:shadow-lg hover:scale-105 transition-all"
+                  title="إرسال"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              </motion.div>
+            ) : isTranscribing ? (
+              <motion.div
+                key="transcribing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-center gap-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-4"
+              >
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                <span className="text-sm text-indigo-600 dark:text-indigo-300 font-medium">
+                  جاري تحويل الصوت إلى نص...
+                </span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative flex items-end gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition-all"
+              >
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  rows={1}
+                  placeholder="اكتب سؤالك أو اضغط على المايك للتحدث..."
+                  disabled={loading}
+                  className="flex-1 bg-transparent px-4 py-3 outline-none resize-none text-sm dark:text-white placeholder:text-gray-400 max-h-32"
+                  style={{ direction: 'rtl' }}
+                />
+
+                {input.trim() ? (
+                  <button
+                    onClick={() => sendMessage()}
+                    disabled={loading}
+                    className="m-1.5 p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-500/20 shrink-0"
+                    title="إرسال"
+                  >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    disabled={loading}
+                    className="m-1.5 p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-rose-500/30 shrink-0"
+                    title="تسجيل صوتي"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <p className="text-[10px] text-gray-400 text-center mt-2">
-            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
+            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • 🎙️ يدعم الإدخال الصوتي
           </p>
         </div>
       </footer>
     </motion.div>
   );
 }
+
 
 function ThinkingAnimation() {
   return (
