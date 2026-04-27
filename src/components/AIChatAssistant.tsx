@@ -654,39 +654,124 @@ export function AIChatAssistant({ onClose }: Props) {
               </button>
             </div>
           )}
-          <div className="relative flex items-end gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              rows={1}
-              placeholder="اكتب سؤالك الدراسي هنا..."
-              disabled={loading}
-              className="flex-1 bg-transparent px-4 py-3 outline-none resize-none text-sm dark:text-white placeholder:text-gray-400 max-h-32"
-              style={{ direction: 'rtl' }}
-            />
-            <button
-              onClick={() => sendMessage()}
-              disabled={loading || !input.trim()}
-              className="m-1.5 p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-500/20 shrink-0"
-              title="إرسال"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          </div>
+
+          <AnimatePresence mode="wait">
+            {isRecording ? (
+              <motion.div
+                key="recording"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="relative flex items-center gap-3 bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40 border border-rose-300/60 dark:border-rose-700/50 rounded-2xl p-3 shadow-lg shadow-rose-500/10"
+              >
+                <button
+                  onClick={() => stopRecording(true)}
+                  className="shrink-0 w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
+                  title="إلغاء"
+                >
+                  <Trash className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <motion.span
+                    animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                    className="w-2.5 h-2.5 rounded-full bg-red-500"
+                  />
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                    {formatRecTime(recordSeconds)}
+                  </span>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center gap-[3px] h-10 overflow-hidden">
+                  {audioLevels.map((h, i) => (
+                    <motion.span
+                      key={i}
+                      className="w-1 rounded-full bg-gradient-to-t from-rose-500 to-pink-400"
+                      animate={{ height: h }}
+                      transition={{ type: 'spring', damping: 15, stiffness: 200 }}
+                      style={{ height: 4 }}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => stopRecording(false)}
+                  className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 hover:shadow-lg hover:scale-105 transition-all"
+                  title="إرسال"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              </motion.div>
+            ) : isTranscribing ? (
+              <motion.div
+                key="transcribing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-center gap-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-4"
+              >
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                <span className="text-sm text-indigo-600 dark:text-indigo-300 font-medium">
+                  جاري تحويل الصوت إلى نص...
+                </span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative flex items-end gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition-all"
+              >
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  rows={1}
+                  placeholder="اكتب سؤالك أو اضغط على المايك للتحدث..."
+                  disabled={loading}
+                  className="flex-1 bg-transparent px-4 py-3 outline-none resize-none text-sm dark:text-white placeholder:text-gray-400 max-h-32"
+                  style={{ direction: 'rtl' }}
+                />
+
+                {input.trim() ? (
+                  <button
+                    onClick={() => sendMessage()}
+                    disabled={loading}
+                    className="m-1.5 p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-500/20 shrink-0"
+                    title="إرسال"
+                  >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    disabled={loading}
+                    className="m-1.5 p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-rose-500/30 shrink-0"
+                    title="تسجيل صوتي"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <p className="text-[10px] text-gray-400 text-center mt-2">
-            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
+            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • 🎙️ يدعم الإدخال الصوتي
           </p>
         </div>
       </footer>
     </motion.div>
   );
 }
+
 
 function ThinkingAnimation() {
   return (
