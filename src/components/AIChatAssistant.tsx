@@ -259,7 +259,7 @@ export function AIChatAssistant({ onClose }: Props) {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                المساعد الذكي
+                Revo Teacher
               </h1>
               <p className="text-[10px] text-gray-500 dark:text-slate-400">
                 دردشة دراسية بدون رفع ملفات
@@ -398,7 +398,7 @@ export function AIChatAssistant({ onClose }: Props) {
               </motion.div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  أهلاً! أنا مساعدك الدراسي 📚
+                  أهلاً! أنا Revo Teacher — معلمك الذكي 📚
                 </h2>
                 <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto">
                   اسألني أي شيء عن دروسك، تمارينك، أو طرق المذاكرة. لست بحاجة لرفع أي ملف.
@@ -500,7 +500,7 @@ export function AIChatAssistant({ onClose }: Props) {
             </button>
           </div>
           <p className="text-[10px] text-gray-400 text-center mt-2">
-            المساعد الذكي مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
+            Revo Teacher مخصص للمواد الدراسية فقط 📚 • Enter للإرسال • Shift+Enter لسطر جديد
           </p>
         </div>
       </footer>
