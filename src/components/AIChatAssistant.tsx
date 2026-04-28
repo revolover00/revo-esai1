@@ -428,7 +428,7 @@ export function AIChatAssistant({ onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30 dark:from-[#020617] dark:via-[#0b1220] dark:to-[#0f0a1f] flex flex-col"
+      className="fixed inset-0 z-[200] bg-white dark:bg-[#020617] flex flex-col"
       dir="rtl"
     >
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 shadow-sm">
