@@ -374,7 +374,35 @@ function StudyApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleGoogleSignIn = async () => {
+  // Load history from cloud when user logs in (merge with local)
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('study_history')
+        .select('id,title,mode,response,created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error && data) {
+        const cloud = data.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          mode: r.mode as Mode,
+          response: r.response,
+          date: new Date(r.created_at).getTime(),
+        }));
+        setHistory((prev) => {
+          const map = new Map<string, typeof prev[number]>();
+          [...cloud, ...prev].forEach((it) => {
+            if (!map.has(it.id) && !Array.from(map.values()).some(v => v.response === it.response)) {
+              map.set(it.id, it);
+            }
+          });
+          return Array.from(map.values()).sort((a, b) => b.date - a.date).slice(0, 50);
+        });
+      }
+    })();
+  }, [user]);
     const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
     if (result.error) console.error('Google sign-in error:', result.error);
   };
