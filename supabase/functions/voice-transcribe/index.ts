@@ -6,7 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Same hardcoded Gemini keys used by study-ai (gemini-2.0-flash supports audio input).
 const GEMINI_DIRECT_KEYS: string[] = [
   "AIzaSyDmugOwEz6nsb_asVfy3Ihcke0YE3o5QtE",
   "AIzaSyCkUx2QS0saAVavVELUNxaoZab0xYywp7M",
@@ -26,7 +25,24 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-async function transcribeWithGemini(apiKey: string, audioBase64: string, mimeType: string): Promise<string | null> {
+// Normalize browser mime types to ones Gemini explicitly supports.
+// Gemini supports: audio/wav, audio/mp3, audio/aiff, audio/aac, audio/ogg, audio/flac
+// `audio/webm` and `audio/mp4` are usually handled too, but we coerce some
+// edge cases (codecs= suffixes, missing prefixes) for safety.
+function normalizeMime(mt: string): string {
+  if (!mt) return "audio/webm";
+  const base = mt.split(";")[0].trim().toLowerCase();
+  if (base === "audio/mpeg") return "audio/mp3";
+  if (base === "audio/x-m4a" || base === "audio/m4a") return "audio/mp4";
+  if (base === "audio/wave") return "audio/wav";
+  return base || "audio/webm";
+}
+
+async function transcribeWithGemini(
+  apiKey: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<{ text: string | null; status: number; rawError?: string }> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const body = {
     contents: [
@@ -35,13 +51,16 @@ async function transcribeWithGemini(apiKey: string, audioBase64: string, mimeTyp
         parts: [
           {
             text:
-              "فرّغ هذا التسجيل الصوتي إلى نص عربي فصيح بدقة 100%. اكتب فقط النص المنطوق بدون أي إضافات أو تعليقات أو علامات اقتباس. إذا كان التسجيل بلغة أخرى، فرّغه بنفس اللغة.",
+              "أنت محرّك تفريغ صوتي (Speech-to-Text). فرّغ هذا التسجيل الصوتي إلى نص بدقة عالية. " +
+              "اكتب فقط النص المنطوق حرفياً بدون أي إضافات، تعليقات، أو علامات اقتباس. " +
+              "إذا كان التسجيل بالعربية، اكتبه بالعربية الفصحى. إذا كان بلغة أخرى، فرّغه بنفس اللغة. " +
+              "إذا لم تستطع سماع أي كلام واضح، أعد كلمة EMPTY فقط.",
           },
           { inlineData: { mimeType, data: audioBase64 } },
         ],
       },
     ],
-    generationConfig: { temperature: 0.0 },
+    generationConfig: { temperature: 0.0, maxOutputTokens: 2048 },
   };
 
   const resp = await fetch(url, {
@@ -53,10 +72,21 @@ async function transcribeWithGemini(apiKey: string, audioBase64: string, mimeTyp
     body: JSON.stringify(body),
   });
 
-  if (!resp.ok) return null;
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    console.warn(`Gemini ${resp.status}:`, errText.slice(0, 300));
+    return { text: null, status: resp.status, rawError: errText.slice(0, 300) };
+  }
   const data = await resp.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join(" ").trim();
-  return text || null;
+  const text = data?.candidates?.[0]?.content?.parts
+    ?.map((p: any) => p.text)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  if (!text || text === "EMPTY") {
+    return { text: null, status: 200, rawError: "empty_transcript" };
+  }
+  return { text, status: 200 };
 }
 
 serve(async (req) => {
@@ -64,32 +94,48 @@ serve(async (req) => {
 
   try {
     const { audio, mimeType } = await req.json();
-    if (!audio || typeof audio !== "string") {
-      return new Response(JSON.stringify({ error: "audio (base64) is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!audio || typeof audio !== "string" || audio.length < 200) {
+      return new Response(
+        JSON.stringify({ error: "تسجيل قصير جداً أو فارغ، حاول التحدث لمدة أطول." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-    const mt = (typeof mimeType === "string" && mimeType) || "audio/webm";
+    const mt = normalizeMime(typeof mimeType === "string" ? mimeType : "audio/webm");
 
     const order = [...GEMINI_DIRECT_KEYS].sort(() => Math.random() - 0.5);
+    let lastError = "unknown";
+    let lastStatus = 502;
     for (const key of order) {
       try {
-        const text = await transcribeWithGemini(key, audio, mt);
-        if (text) {
-          return new Response(JSON.stringify({ text }), {
+        const result = await transcribeWithGemini(key, audio, mt);
+        if (result.text) {
+          return new Response(JSON.stringify({ text: result.text }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+        lastError = result.rawError || "no_text";
+        lastStatus = result.status;
+        // If it's a quota / rate limit, try the next key. Otherwise (e.g. 400 invalid audio), no point retrying.
+        if (result.status !== 429 && result.status !== 403 && result.status !== 500 && result.status !== 503) {
+          break;
+        }
       } catch (e) {
         console.warn("transcribe key failed", e);
+        lastError = e instanceof Error ? e.message : String(e);
       }
     }
 
-    return new Response(JSON.stringify({ error: "تعذر تفريغ الصوت، حاول مرة أخرى." }), {
-      status: 502,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const userMsg =
+      lastError === "empty_transcript"
+        ? "لم أسمع أي كلام واضح في التسجيل، حاول التحدث بصوت أعلى."
+        : lastStatus === 400
+          ? "صيغة الصوت غير مدعومة، جرّب من متصفح آخر."
+          : "تعذر تفريغ الصوت، حاول مرة أخرى.";
+
+    return new Response(
+      JSON.stringify({ error: userMsg, debug: lastError, status: lastStatus }),
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
