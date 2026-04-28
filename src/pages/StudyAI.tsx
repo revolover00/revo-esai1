@@ -184,7 +184,7 @@ function StudyApp() {
     localStorage.setItem('revo_esai_history', JSON.stringify(history));
   }, [history]);
 
-  const addToHistory = (title: string, mode: Mode, response: string) => {
+  const addToHistory = async (title: string, mode: Mode, response: string) => {
     // Check if already saved to avoid duplicates
     const isAlreadySaved = history.some(item => item.response === response);
     if (isAlreadySaved) {
@@ -193,7 +193,7 @@ function StudyApp() {
     }
 
     const newItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
       title: title || 'بدون عنوان',
       mode,
       response,
@@ -202,10 +202,24 @@ function StudyApp() {
     setHistory(prev => [newItem, ...prev].slice(0, 50)); // Keep last 50 items
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
+
+    // Cloud sync
+    if (user) {
+      await supabase.from('study_history').insert({
+        id: newItem.id,
+        user_id: user.id,
+        title: newItem.title,
+        mode: newItem.mode,
+        response: newItem.response,
+      });
+    }
   };
 
-  const deleteFromHistory = (id: string) => {
+  const deleteFromHistory = async (id: string) => {
     setHistory(prev => prev.filter(item => item.id !== id));
+    if (user) {
+      await supabase.from('study_history').delete().eq('id', id);
+    }
   };
 
   const isQuotaError = (err: any) => {
