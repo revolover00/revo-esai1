@@ -36,7 +36,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import * as pdfjsLib from 'pdfjs-dist';
-import { LogIn, LogOut, Ticket } from 'lucide-react';
+import { LogIn, LogOut, Ticket, Settings, User as UserIcon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable';
 import type { User } from '@supabase/supabase-js';
@@ -176,7 +184,7 @@ function StudyApp() {
     localStorage.setItem('revo_esai_history', JSON.stringify(history));
   }, [history]);
 
-  const addToHistory = (title: string, mode: Mode, response: string) => {
+  const addToHistory = async (title: string, mode: Mode, response: string) => {
     // Check if already saved to avoid duplicates
     const isAlreadySaved = history.some(item => item.response === response);
     if (isAlreadySaved) {
@@ -185,7 +193,7 @@ function StudyApp() {
     }
 
     const newItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
       title: title || 'بدون عنوان',
       mode,
       response,
@@ -194,10 +202,24 @@ function StudyApp() {
     setHistory(prev => [newItem, ...prev].slice(0, 50)); // Keep last 50 items
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
+
+    // Cloud sync
+    if (user) {
+      await supabase.from('study_history').insert({
+        id: newItem.id,
+        user_id: user.id,
+        title: newItem.title,
+        mode: newItem.mode,
+        response: newItem.response,
+      });
+    }
   };
 
-  const deleteFromHistory = (id: string) => {
+  const deleteFromHistory = async (id: string) => {
     setHistory(prev => prev.filter(item => item.id !== id));
+    if (user) {
+      await supabase.from('study_history').delete().eq('id', id);
+    }
   };
 
   const isQuotaError = (err: any) => {
@@ -351,6 +373,36 @@ function StudyApp() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load history from cloud when user logs in (merge with local)
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('study_history')
+        .select('id,title,mode,response,created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error && data) {
+        const cloud = data.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          mode: r.mode as Mode,
+          response: r.response,
+          date: new Date(r.created_at).getTime(),
+        }));
+        setHistory((prev) => {
+          const map = new Map<string, typeof prev[number]>();
+          [...cloud, ...prev].forEach((it) => {
+            if (!map.has(it.id) && !Array.from(map.values()).some(v => v.response === it.response)) {
+              map.set(it.id, it);
+            }
+          });
+          return Array.from(map.values()).sort((a, b) => b.date - a.date).slice(0, 50);
+        });
+      }
+    })();
+  }, [user]);
 
   const handleGoogleSignIn = async () => {
     const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
@@ -1473,25 +1525,48 @@ function StudyApp() {
             >
               {isBrowserFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
-            <button 
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
             {user ? (
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                title="تسجيل الخروج"
-              >
-                {user.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
-                ) : (
-                  <LogOut className="w-5 h-5" />
-                )}
-                <span className="text-sm hidden sm:block">خروج</span>
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                    title="الإعدادات"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuLabel className="flex items-center gap-2 py-2">
+                    {user.user_metadata?.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-indigo-600" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate">{user.user_metadata?.full_name || 'حسابي'}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setDarkMode(false)} className="gap-2 cursor-pointer">
+                    <Sun className="w-4 h-4" />
+                    المظهر الفاتح
+                    {!darkMode && <span className="ml-auto text-[10px] text-amber-500">●</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDarkMode(true)} className="gap-2 cursor-pointer">
+                    <Moon className="w-4 h-4" />
+                    المظهر الداكن
+                    {darkMode && <span className="ml-auto text-[10px] text-amber-500">●</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="gap-2 cursor-pointer text-red-600 focus:text-red-600">
+                    <LogOut className="w-4 h-4" />
+                    تسجيل الخروج
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <button
                 onClick={handleGoogleSignIn}
@@ -1588,13 +1663,13 @@ function StudyApp() {
                     <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                   </div>
 
-                  {/* Open AI Chat Assistant (no upload needed) */}
+                  {/* Open AI Chat Assistant (no upload needed) — gold */}
                   <button
                     onClick={() => setShowChatAssistant(true)}
-                    className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 flex items-center justify-center gap-3 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white relative overflow-hidden group"
+                    className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 flex items-center justify-center gap-3 bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 ring-1 ring-amber-600/40 relative overflow-hidden group"
                   >
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
-                    <Sparkles className="w-5 h-5 relative z-10" />
+                    <img src={logoImage} alt="Revo" className="w-6 h-6 object-contain relative z-10 drop-shadow-sm" />
                     <span className="relative z-10">تحدث مع Revo Teacher بدون رفع ملفات</span>
                   </button>
                 </div>
@@ -2189,7 +2264,7 @@ function StudyApp() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
-        <p>© {new Date().getFullYear()} StudyAI - تعلم بذكاء، لا بجهد</p>
+        <p>© 2026 Revo code  - تعلم بذكاء، لا بجهد</p>
       </footer>
 
       {/* Splash Screen / Prayer Modal */}

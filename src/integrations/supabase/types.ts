@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       redemption_codes: {
         Row: {
           code: string
@@ -38,6 +65,33 @@ export type Database = {
           is_developer?: boolean
           used_at?: string | null
           used_by?: string | null
+        }
+        Relationships: []
+      }
+      study_history: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          response: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode: string
+          response: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          response?: string
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
