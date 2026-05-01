@@ -80,27 +80,26 @@ const Doodle = {
 export function CreativeMindMap({ data }: { data: MindMapData }) {
   const branches = data.branches.slice(0, 6);
 
-  // Positions matching the uploaded reference image (percent-based on a 794x1123 frame)
-  // Order: top, left-upper, right-upper, left-lower, right-lower, bottom
+  // Slots are CENTERS of each colored card (percent of 840x1188 frame)
   const slots = [
-    { top: '11%', left: '50%', tx: '-50%', ty: '0%', titleColor: '#9f1239' },     // pink - top
-    { top: '32%', left: '17%', tx: '0%',   ty: '0%', titleColor: '#15803d' },     // green - left upper
-    { top: '32%', left: '83%', tx: '-100%',ty: '0%', titleColor: '#0369a1' },     // blue - right upper
-    { top: '63%', left: '17%', tx: '0%',   ty: '0%', titleColor: '#9a3412' },     // orange - left lower
-    { top: '63%', left: '83%', tx: '-100%',ty: '0%', titleColor: '#6d28d9' },     // purple - right lower
-    { top: '85%', left: '50%', tx: '-50%', ty: '-100%', titleColor: '#0f766e' },  // teal - bottom
+    { cx: '50%', cy: '17%', w: '34%', h: '15%', titleColor: '#9f1239' }, // pink top
+    { cx: '22%', cy: '36%', w: '28%', h: '14%', titleColor: '#15803d' }, // green left-upper
+    { cx: '78%', cy: '36%', w: '28%', h: '14%', titleColor: '#0369a1' }, // blue right-upper
+    { cx: '22%', cy: '67%', w: '28%', h: '14%', titleColor: '#9a3412' }, // orange left-lower
+    { cx: '78%', cy: '67%', w: '28%', h: '14%', titleColor: '#6d28d9' }, // purple right-lower
+    { cx: '50%', cy: '87%', w: '34%', h: '15%', titleColor: '#0f766e' }, // teal bottom
   ];
 
   return (
     <div
-      className="relative w-full rounded-3xl overflow-hidden bg-white"
-      style={{ aspectRatio: '794 / 1123' }}
+      className="relative w-full"
+      style={{ aspectRatio: '840 / 1188' }}
     >
-      {/* Reference background image */}
+      {/* Reference background image (transparent) */}
       <img
         src={creativeBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
         draggable={false}
       />
 
@@ -111,18 +110,18 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 12 }}
         className="absolute z-10 flex items-center justify-center text-center"
         style={{
-          top: '50%',
+          top: '52%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '22%',
-          height: '14%',
+          width: '20%',
+          height: '12%',
         }}
       >
         <p
-          className="font-black text-slate-900 leading-tight px-2"
+          className="font-black text-slate-900 leading-tight px-1"
           style={{
             fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-            fontSize: 'clamp(11px, 1.6vw, 20px)',
+            fontSize: 'clamp(10px, 1.5vw, 18px)',
           }}
         >
           {data.title}
@@ -139,21 +138,21 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1, type: 'spring' }}
-            className="absolute z-10 flex flex-col items-center justify-center text-center px-3"
+            className="absolute z-10 flex flex-col items-center justify-center text-center px-2"
             style={{
-              top: slot.top,
-              left: slot.left,
-              transform: `translate(${slot.tx}, ${slot.ty})`,
-              width: '24%',
-              height: '14%',
+              top: slot.cy,
+              left: slot.cx,
+              transform: 'translate(-50%, -50%)',
+              width: slot.w,
+              height: slot.h,
             }}
           >
             <h3
-              className="font-black mb-1 leading-tight"
+              className="font-black mb-0.5 leading-tight"
               style={{
                 color: slot.titleColor,
                 fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-                fontSize: 'clamp(10px, 1.4vw, 16px)',
+                fontSize: 'clamp(9px, 1.2vw, 14px)',
               }}
             >
               {branch.label}
@@ -162,7 +161,10 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               className="text-slate-800 leading-snug overflow-hidden"
               style={{
                 fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-                fontSize: 'clamp(8px, 1vw, 12px)',
+                fontSize: 'clamp(7px, 0.9vw, 11px)',
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
               }}
             >
               {branch.children.slice(0, 3).join(' • ')}
