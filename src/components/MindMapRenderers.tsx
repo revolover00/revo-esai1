@@ -1,4 +1,6 @@
 import { motion } from 'motion/react';
+import notesBg from '@/assets/mindmap-style-notes.webp';
+import creativeBg from '@/assets/mindmap-style-creative.webp';
 
 export interface MindMapBranch {
   label: string;
