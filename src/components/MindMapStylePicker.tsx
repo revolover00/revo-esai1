@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Network, Sparkles, StickyNote, Briefcase } from 'lucide-react';
+import { X, Network, Sparkles, StickyNote } from 'lucide-react';
+import notesPreview from '@/assets/mindmap-style-notes.webp';
+import creativePreview from '@/assets/mindmap-style-creative.webp';
 
 export type MindMapStyle = 'modern' | 'creative' | 'notes' | 'business';
 
@@ -38,28 +40,7 @@ const STYLE_OPTIONS: StyleOption[] = [
     description: 'أسلوب رسم يدوي مع نجمة مركزية وفقاعات ملونة',
     icon: <Sparkles className="w-5 h-5" />,
     preview: (
-      <svg viewBox="0 0 200 130" className="w-full h-full">
-        {/* center burst */}
-        <polygon
-          points="100,30 110,50 130,50 115,65 122,85 100,75 78,85 85,65 70,50 90,50"
-          fill="#ef4444"
-          stroke="#1f2937"
-          strokeWidth="1.5"
-        />
-        <text x="100" y="62" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">
-          IDEA
-        </text>
-        {/* squiggly lines */}
-        <path d="M70 55 Q 50 45, 35 30" stroke="#1f2937" strokeWidth="1.5" fill="none" strokeDasharray="2,2" />
-        <path d="M130 55 Q 150 45, 165 30" stroke="#1f2937" strokeWidth="1.5" fill="none" strokeDasharray="2,2" />
-        <path d="M75 80 Q 55 95, 35 105" stroke="#1f2937" strokeWidth="1.5" fill="none" strokeDasharray="2,2" />
-        <path d="M125 80 Q 145 95, 165 105" stroke="#1f2937" strokeWidth="1.5" fill="none" strokeDasharray="2,2" />
-        {/* bubbles */}
-        <ellipse cx="25" cy="25" rx="22" ry="14" fill="#fce7f3" stroke="#1f2937" strokeWidth="1.2" />
-        <ellipse cx="175" cy="25" rx="22" ry="14" fill="#dbeafe" stroke="#1f2937" strokeWidth="1.2" />
-        <ellipse cx="25" cy="110" rx="22" ry="14" fill="#fef3c7" stroke="#1f2937" strokeWidth="1.2" />
-        <ellipse cx="175" cy="110" rx="22" ry="14" fill="#dcfce7" stroke="#1f2937" strokeWidth="1.2" />
-      </svg>
+      <img src={creativePreview} alt="Creative mind map style" className="w-full h-full object-contain" />
     ),
   },
   {
@@ -68,65 +49,7 @@ const STYLE_OPTIONS: StyleOption[] = [
     description: 'بطاقات ورقية ملصقة بأشرطة ملونة وأسهم منحنية',
     icon: <StickyNote className="w-5 h-5" />,
     preview: (
-      <svg viewBox="0 0 200 130" className="w-full h-full">
-        {/* center card */}
-        <rect x="75" y="50" width="55" height="35" fill="#fef3c7" stroke="#1f2937" strokeWidth="1" transform="rotate(-2 102 67)" />
-        <text x="102" y="72" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1f2937">
-          MIND MAP
-        </text>
-        {/* sticky notes */}
-        <rect x="10" y="10" width="45" height="28" fill="#fef3c7" stroke="#1f2937" strokeWidth="0.8" transform="rotate(-3 32 24)" />
-        <rect x="135" y="10" width="45" height="28" fill="#e9d5ff" stroke="#1f2937" strokeWidth="0.8" transform="rotate(2 157 24)" />
-        <rect x="10" y="92" width="45" height="28" fill="#fef3c7" stroke="#1f2937" strokeWidth="0.8" transform="rotate(2 32 106)" />
-        <rect x="135" y="92" width="45" height="28" fill="#e9d5ff" stroke="#1f2937" strokeWidth="0.8" transform="rotate(-2 157 106)" />
-        {/* tape strips */}
-        <rect x="20" y="6" width="20" height="6" fill="#a78bfa" opacity="0.7" />
-        <rect x="145" y="6" width="20" height="6" fill="#fbbf24" opacity="0.7" />
-        {/* curvy arrows */}
-        <path d="M55 25 Q 70 35, 80 55" stroke="#1f2937" strokeWidth="1" fill="none" markerEnd="url(#a1)" />
-        <path d="M145 25 Q 130 35, 125 55" stroke="#1f2937" strokeWidth="1" fill="none" />
-        <defs>
-          <marker id="a1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M0,0 L6,3 L0,6 Z" fill="#1f2937" />
-          </marker>
-        </defs>
-      </svg>
-    ),
-  },
-  {
-    id: 'business',
-    label: 'الأعمال والمخططات',
-    description: 'نمط احترافي بنجمة مركزية وبطاقات بألوان متنوعة',
-    icon: <Briefcase className="w-5 h-5" />,
-    preview: (
-      <svg viewBox="0 0 200 130" className="w-full h-full">
-        {/* Star burst */}
-        <polygon
-          points="100,40 108,55 125,52 115,65 125,78 108,75 100,90 92,75 75,78 85,65 75,52 92,55"
-          fill="#f87171"
-          stroke="#1f2937"
-          strokeWidth="1"
-        />
-        <text x="100" y="68" textAnchor="middle" fontSize="6" fill="white" fontWeight="bold">
-          BIZ MODEL
-        </text>
-        {/* clouds & cards */}
-        <ellipse cx="30" cy="30" rx="25" ry="14" fill="#bbf7d0" stroke="#1f2937" strokeWidth="0.8" />
-        <rect x="80" y="8" width="40" height="20" fill="#bfdbfe" stroke="#1f2937" strokeWidth="0.8" />
-        <rect x="150" y="20" width="40" height="22" fill="#fde68a" stroke="#1f2937" strokeWidth="0.8" />
-        <rect x="10" y="95" width="40" height="22" fill="#fecaca" stroke="#1f2937" strokeWidth="0.8" />
-        <ellipse cx="100" cy="110" rx="25" ry="13" fill="#bbf7d0" stroke="#1f2937" strokeWidth="0.8" />
-        <rect x="155" y="90" width="40" height="22" fill="#fbcfe8" stroke="#1f2937" strokeWidth="0.8" />
-        {/* arrows */}
-        <path d="M55 35 L 78 50" stroke="#1f2937" strokeWidth="0.8" fill="none" markerEnd="url(#b1)" />
-        <path d="M100 28 L 100 42" stroke="#1f2937" strokeWidth="0.8" fill="none" markerEnd="url(#b1)" />
-        <path d="M150 35 L 122 50" stroke="#1f2937" strokeWidth="0.8" fill="none" markerEnd="url(#b1)" />
-        <defs>
-          <marker id="b1" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-            <path d="M0,0 L5,2.5 L0,5 Z" fill="#1f2937" />
-          </marker>
-        </defs>
-      </svg>
+      <img src={notesPreview} alt="Sticky notes mind map style" className="w-full h-full object-contain" />
     ),
   },
 ];
@@ -176,7 +99,7 @@ export function MindMapStylePicker({ open, onClose, onSelect }: Props) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {STYLE_OPTIONS.map((opt) => (
                 <motion.button
                   key={opt.id}
