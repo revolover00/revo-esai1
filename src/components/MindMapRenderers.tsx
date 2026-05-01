@@ -183,24 +183,24 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
 export function NotesMindMap({ data }: { data: MindMapData }) {
   const branches = data.branches.slice(0, 4);
 
-  // Positions for the 4 corner sticky notes (matches reference image)
+  // Centers of each corner sticky-note strip in the 1536x1024 background
   const slots = [
-    { top: '11%', left: '20%', tx: '-50%', ty: '0%' },   // top-left
-    { top: '11%', left: '80%', tx: '-50%', ty: '0%' },   // top-right
-    { top: '78%', left: '20%', tx: '-50%', ty: '0%' },   // bottom-left
-    { top: '78%', left: '80%', tx: '-50%', ty: '0%' },   // bottom-right
+    { cx: '22%', cy: '15%', w: '26%', h: '14%' }, // top-left strip
+    { cx: '78%', cy: '15%', w: '26%', h: '14%' }, // top-right strip
+    { cx: '22%', cy: '78%', w: '26%', h: '14%' }, // bottom-left strip
+    { cx: '78%', cy: '78%', w: '26%', h: '14%' }, // bottom-right strip
   ];
 
   return (
     <div
-      className="relative w-full rounded-3xl overflow-hidden bg-white"
-      style={{ aspectRatio: '1280 / 853' }}
+      className="relative w-full"
+      style={{ aspectRatio: '1536 / 1024' }}
     >
-      {/* Reference background image */}
+      {/* Reference background image (transparent) */}
       <img
         src={notesBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
         draggable={false}
       />
 
@@ -214,15 +214,15 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%) rotate(-2deg)',
-          width: '28%',
-          height: '20%',
+          width: '24%',
+          height: '22%',
         }}
       >
         <p
           className="font-black text-slate-900 leading-tight"
           style={{
             fontFamily: 'Georgia, serif',
-            fontSize: 'clamp(14px, 2.2vw, 28px)',
+            fontSize: 'clamp(12px, 1.8vw, 24px)',
           }}
         >
           {data.title}
@@ -238,20 +238,20 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1, type: 'spring' }}
-            className="absolute z-10 flex flex-col items-center justify-center text-center px-3"
+            className="absolute z-10 flex flex-col items-center justify-center text-center px-2"
             style={{
-              top: slot.top,
-              left: slot.left,
-              transform: `translate(${slot.tx}, ${slot.ty})`,
-              width: '22%',
-              height: '14%',
+              top: slot.cy,
+              left: slot.cx,
+              transform: 'translate(-50%, -50%)',
+              width: slot.w,
+              height: slot.h,
             }}
           >
             <h3
-              className="font-black text-slate-900 mb-1 uppercase tracking-wide leading-tight"
+              className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
               style={{
                 fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(10px, 1.3vw, 16px)',
+                fontSize: 'clamp(9px, 1.1vw, 14px)',
               }}
             >
               {branch.label}
@@ -260,7 +260,10 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
               className="text-slate-700 leading-snug overflow-hidden"
               style={{
                 fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(8px, 1vw, 12px)',
+                fontSize: 'clamp(7px, 0.9vw, 11px)',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
               }}
             >
               {branch.children.slice(0, 2).join(' • ')}
