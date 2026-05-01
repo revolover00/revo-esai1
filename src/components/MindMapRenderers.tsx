@@ -179,214 +179,93 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
    Matches images_6-2.jpeg exactly
    ============================================================ */
 export function NotesMindMap({ data }: { data: MindMapData }) {
-  // Reference uses cream notes with purple OR cream tape strips
-  const items = [
-    { tape: '#c4b5fd', tapeIsLabel: true },   // purple full label tape
-    { tape: '#c4b5fd', tapeIsLabel: true },
-    { tape: '#fef3c7', tapeIsLabel: false },
-    { tape: '#fef3c7', tapeIsLabel: false },
-    { tape: '#c4b5fd', tapeIsLabel: true },
-    { tape: '#fef3c7', tapeIsLabel: false },
+  const branches = data.branches.slice(0, 4);
+
+  // Positions for the 4 corner sticky notes (matches reference image)
+  const slots = [
+    { top: '11%', left: '20%', tx: '-50%', ty: '0%' },   // top-left
+    { top: '11%', left: '80%', tx: '-50%', ty: '0%' },   // top-right
+    { top: '78%', left: '20%', tx: '-50%', ty: '0%' },   // bottom-left
+    { top: '78%', left: '80%', tx: '-50%', ty: '0%' },   // bottom-right
   ];
-  const noteBg = '#fdf6e3';
-  const branches = data.branches.slice(0, 6);
-
-  // Layout: 3 cols x 2 rows around centered card
-  // We'll position them around the central card
-
-  const CurvyArrow = ({ d }: { d: string }) => (
-    <svg className="absolute pointer-events-none" style={{ overflow: 'visible' }}>
-      <defs>
-        <marker id="notesArr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-          <path d="M0,0 L8,4 L0,8 Z" fill="#1f2937" />
-        </marker>
-      </defs>
-      <path d={d} stroke="#1f2937" strokeWidth="1.5" fill="none" markerEnd="url(#notesArr)" strokeLinecap="round" />
-    </svg>
-  );
 
   return (
-    <div className="relative py-10 px-4 md:px-8 rounded-3xl overflow-hidden transition-colors bg-[#fafafa] dark:bg-slate-900 min-h-[600px]">
-      <div className="relative grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 items-center">
-        {/* LEFT column */}
-        <div className="space-y-8">
-          {[0, 1].map((slot) => {
-            const idx = slot === 0 ? 0 : 1;
-            const branch = branches[idx];
-            if (!branch) return <div key={slot} />;
-            const cfg = items[idx];
-            return (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, rotate: idx % 2 === 0 ? -1.5 : 1 }}
-                transition={{ delay: idx * 0.1, type: 'spring' }}
-                className="relative shadow-md"
-                style={{ background: noteBg }}
-              >
-                {/* tape strips at corners */}
-                <div
-                  className="absolute -top-3 left-2 w-14 h-5 opacity-90 shadow-sm"
-                  style={{ background: cfg.tape, transform: 'rotate(-8deg)' }}
-                />
-                <div
-                  className="absolute -top-3 right-2 w-14 h-5 opacity-90 shadow-sm"
-                  style={{ background: cfg.tape, transform: 'rotate(6deg)' }}
-                />
+    <div
+      className="relative w-full rounded-3xl overflow-hidden bg-white"
+      style={{ aspectRatio: '1280 / 853' }}
+    >
+      {/* Reference background image */}
+      <img
+        src={notesBg}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+        draggable={false}
+      />
 
-                <div className="p-5 pt-6">
-                  {cfg.tapeIsLabel ? (
-                    <div
-                      className="inline-block px-3 py-1 mb-2 -ml-3"
-                      style={{ background: cfg.tape, transform: 'rotate(-2deg)' }}
-                    >
-                      <h3 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                        {branch.label}
-                      </h3>
-                    </div>
-                  ) : (
-                    <h3 className="text-base font-black text-slate-900 uppercase tracking-wider mb-2">
-                      {branch.label}
-                    </h3>
-                  )}
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    {branch.children.join('. ')}.
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
+      {/* Central title on the paper-clipped card */}
+      <motion.div
+        initial={{ scale: 0, rotate: -8 }}
+        animate={{ scale: 1, rotate: -2 }}
+        transition={{ type: 'spring', stiffness: 120 }}
+        className="absolute z-10 flex items-center justify-center text-center px-4"
+        style={{
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%) rotate(-2deg)',
+          width: '28%',
+          height: '20%',
+        }}
+      >
+        <p
+          className="font-black text-slate-900 leading-tight"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(14px, 2.2vw, 28px)',
+          }}
+        >
+          {data.title}
+        </p>
+      </motion.div>
 
-        {/* CENTER card */}
-        <div className="flex justify-center items-center order-first md:order-none">
+      {/* Branch content placed on each corner sticky note */}
+      {branches.map((branch, idx) => {
+        const slot = slots[idx];
+        return (
           <motion.div
-            initial={{ scale: 0, rotate: -8 }}
-            animate={{ scale: 1, rotate: -2 }}
-            transition={{ type: 'spring', stiffness: 120 }}
-            className="relative px-10 py-12 shadow-2xl"
+            key={idx}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.1, type: 'spring' }}
+            className="absolute z-10 flex flex-col items-center justify-center text-center px-3"
             style={{
-              background: noteBg,
-              minWidth: '220px',
-              borderRadius: '4px',
-              border: '1px solid rgba(0,0,0,0.08)',
+              top: slot.top,
+              left: slot.left,
+              transform: `translate(${slot.tx}, ${slot.ty})`,
+              width: '22%',
+              height: '14%',
             }}
           >
-            {/* paperclip on top */}
-            <svg
-              className="absolute -top-7 left-1/2 -translate-x-1/2"
-              width="24" height="44" viewBox="0 0 24 44" fill="none"
+            <h3
+              className="font-black text-slate-900 mb-1 uppercase tracking-wide leading-tight"
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(10px, 1.3vw, 16px)',
+              }}
             >
-              <path
-                d="M12 2 C 18 2, 21 6, 21 12 L 21 32 C 21 38, 17 41, 12 41 C 7 41, 4 38, 4 33 L 4 14 C 4 10, 7 8, 11 8 C 15 8, 17 10, 17 14 L 17 30"
-                stroke="#64748b" strokeWidth="2.2" fill="none" strokeLinecap="round"
-              />
-            </svg>
+              {branch.label}
+            </h3>
             <p
-              className="text-3xl font-black text-slate-900 tracking-wide text-center uppercase"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-slate-700 leading-snug overflow-hidden"
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(8px, 1vw, 12px)',
+              }}
             >
-              {data.title}
+              {branch.children.slice(0, 2).join(' • ')}
             </p>
           </motion.div>
-        </div>
-
-        {/* RIGHT column */}
-        <div className="space-y-8">
-          {[0, 1].map((slot) => {
-            const idx = slot === 0 ? 2 : 3;
-            const branch = branches[idx];
-            if (!branch) return <div key={slot} />;
-            const cfg = items[idx];
-            return (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, rotate: idx % 2 === 0 ? 1.5 : -1 }}
-                transition={{ delay: idx * 0.1, type: 'spring' }}
-                className="relative shadow-md"
-                style={{ background: noteBg }}
-              >
-                <div
-                  className="absolute -top-3 left-2 w-14 h-5 opacity-90 shadow-sm"
-                  style={{ background: cfg.tape, transform: 'rotate(-8deg)' }}
-                />
-                <div
-                  className="absolute -top-3 right-2 w-14 h-5 opacity-90 shadow-sm"
-                  style={{ background: cfg.tape, transform: 'rotate(6deg)' }}
-                />
-
-                <div className="p-5 pt-6">
-                  {cfg.tapeIsLabel ? (
-                    <div
-                      className="inline-block px-3 py-1 mb-2 -ml-3"
-                      style={{ background: cfg.tape, transform: 'rotate(2deg)' }}
-                    >
-                      <h3 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                        {branch.label}
-                      </h3>
-                    </div>
-                  ) : (
-                    <h3 className="text-base font-black text-slate-900 uppercase tracking-wider mb-2">
-                      {branch.label}
-                    </h3>
-                  )}
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    {branch.children.join('. ')}.
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* BOTTOM row spans full width */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 mt-10 px-2 md:px-12">
-        {[4, 5].map((idx) => {
-          const branch = branches[idx];
-          if (!branch) return null;
-          const cfg = items[idx];
-          return (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0, rotate: idx === 4 ? -1 : 1 }}
-              transition={{ delay: idx * 0.1, type: 'spring' }}
-              className="relative shadow-md"
-              style={{ background: noteBg }}
-            >
-              <div
-                className="absolute -top-3 left-2 w-14 h-5 opacity-90 shadow-sm"
-                style={{ background: cfg.tape, transform: 'rotate(-8deg)' }}
-              />
-              <div
-                className="absolute -top-3 right-2 w-14 h-5 opacity-90 shadow-sm"
-                style={{ background: cfg.tape, transform: 'rotate(6deg)' }}
-              />
-              <div className="p-5 pt-6">
-                {cfg.tapeIsLabel ? (
-                  <div
-                    className="inline-block px-3 py-1 mb-2 -ml-3"
-                    style={{ background: cfg.tape, transform: 'rotate(-2deg)' }}
-                  >
-                    <h3 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                      {branch.label}
-                    </h3>
-                  </div>
-                ) : (
-                  <h3 className="text-base font-black text-slate-900 uppercase tracking-wider mb-2">
-                    {branch.label}
-                  </h3>
-                )}
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  {branch.children.join('. ')}.
-                </p>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+        );
+      })}
     </div>
   );
 }
