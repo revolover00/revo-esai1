@@ -78,118 +78,98 @@ const Doodle = {
    Matches images_7-2.jpeg exactly
    ============================================================ */
 export function CreativeMindMap({ data }: { data: MindMapData }) {
-  // Pastel cloud colors matching reference
-  const cloudColors = [
-    { bg: '#fbcfe8', border: '#1f2937' },  // pink
-    { bg: '#fed7aa', border: '#1f2937' },  // peach
-    { bg: '#bbf7d0', border: '#1f2937' },  // green
-    { bg: '#fde68a', border: '#1f2937' },  // yellow
-    { bg: '#bfdbfe', border: '#1f2937' },  // blue
-    { bg: '#e9d5ff', border: '#1f2937' },  // purple
-  ];
-
   const branches = data.branches.slice(0, 6);
 
+  // Positions matching the uploaded reference image (percent-based on a 794x1123 frame)
+  // Order: top, left-upper, right-upper, left-lower, right-lower, bottom
+  const slots = [
+    { top: '11%', left: '50%', tx: '-50%', ty: '0%', titleColor: '#9f1239' },     // pink - top
+    { top: '32%', left: '17%', tx: '0%',   ty: '0%', titleColor: '#15803d' },     // green - left upper
+    { top: '32%', left: '83%', tx: '-100%',ty: '0%', titleColor: '#0369a1' },     // blue - right upper
+    { top: '63%', left: '17%', tx: '0%',   ty: '0%', titleColor: '#9a3412' },     // orange - left lower
+    { top: '63%', left: '83%', tx: '-100%',ty: '0%', titleColor: '#6d28d9' },     // purple - right lower
+    { top: '85%', left: '50%', tx: '-50%', ty: '-100%', titleColor: '#0f766e' },  // teal - bottom
+  ];
+
   return (
-    <div className="relative py-10 px-6 bg-[#fdfcf7] dark:bg-slate-900 rounded-3xl overflow-hidden transition-colors min-h-[700px]">
-      {/* paper grain texture */}
-      <div
-        className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1] pointer-events-none"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 20% 30%, #000 0.5px, transparent 0.5px), radial-gradient(circle at 70% 80%, #000 0.5px, transparent 0.5px)',
-          backgroundSize: '20px 20px',
-        }}
+    <div
+      className="relative w-full rounded-3xl overflow-hidden bg-white"
+      style={{ aspectRatio: '794 / 1123' }}
+    >
+      {/* Reference background image */}
+      <img
+        src={creativeBg}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+        draggable={false}
       />
 
-      {/* Decorative doodles in corners and sides */}
-      <Doodle.Lightbulb className="absolute top-4 left-4 opacity-90" size={56} />
-      <Doodle.Lightbulb className="absolute top-1/2 left-2 opacity-80 -translate-y-1/2" size={48} />
-      <Doodle.Lightbulb className="absolute bottom-4 left-6 opacity-80" size={50} />
-      <Doodle.Exclaim className="absolute top-6 right-1/4 opacity-80" size={36} />
-      <Doodle.Exclaim className="absolute bottom-6 right-1/3 opacity-80" size={36} />
-      <Doodle.Question className="absolute top-1/3 right-4 opacity-70" size={42} />
-      <Doodle.Paper className="absolute top-6 right-6 opacity-90" size={56} />
-      <Doodle.Pencil className="absolute bottom-8 right-8 opacity-90" size={56} />
-
-      {/* Central red star burst */}
-      <div className="flex justify-center mb-12 relative z-20 pt-4">
-        <motion.div
-          initial={{ scale: 0, rotate: -15 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 120, damping: 12 }}
-          className="relative"
+      {/* Central title inside the pink burst */}
+      <motion.div
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 120, damping: 12 }}
+        className="absolute z-10 flex items-center justify-center text-center"
+        style={{
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '22%',
+          height: '14%',
+        }}
+      >
+        <p
+          className="font-black text-slate-900 leading-tight px-2"
+          style={{
+            fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
+            fontSize: 'clamp(11px, 1.6vw, 20px)',
+          }}
         >
-          <svg width="240" height="220" viewBox="0 0 240 220">
-            {/* spiky star shape */}
-            <polygon
-              points="120,8 138,48 178,38 158,78 200,90 165,118 195,160 145,150 130,200 110,160 70,195 80,150 30,158 65,120 25,90 70,82 50,40 95,52"
-              fill="#ef4444"
-              stroke="#1f2937"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-12">
-            <p className="text-white font-black text-2xl leading-tight" style={{ fontFamily: '"Comic Sans MS", "Marker Felt", cursive', textShadow: '1px 1px 0 rgba(0,0,0,0.3)' }}>
-              {data.title}
-            </p>
-          </div>
-        </motion.div>
-      </div>
+          {data.title}
+        </p>
+      </motion.div>
 
-      {/* Cloud bubbles arranged in grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-10 relative z-10 px-4 md:px-12">
-        {branches.map((branch, idx) => {
-          const cloud = cloudColors[idx % cloudColors.length];
-          const tilt = idx % 2 === 0 ? -1.5 : 1.5;
-          return (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, scale: 0.85, rotate: tilt * 2 }}
-              animate={{ opacity: 1, scale: 1, rotate: tilt }}
-              transition={{ delay: idx * 0.12, type: 'spring' }}
-              className="relative"
+      {/* Branch content laid over each colored box */}
+      {branches.map((branch, idx) => {
+        const slot = slots[idx];
+        if (!slot) return null;
+        return (
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1, type: 'spring' }}
+            className="absolute z-10 flex flex-col items-center justify-center text-center px-3"
+            style={{
+              top: slot.top,
+              left: slot.left,
+              transform: `translate(${slot.tx}, ${slot.ty})`,
+              width: '24%',
+              height: '14%',
+            }}
+          >
+            <h3
+              className="font-black mb-1 leading-tight"
+              style={{
+                color: slot.titleColor,
+                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
+                fontSize: 'clamp(10px, 1.4vw, 16px)',
+              }}
             >
-              {/* Title above cloud (like reference) */}
-              <h3
-                className="text-xl font-black text-slate-900 dark:text-slate-100 mb-1 px-2"
-                style={{ fontFamily: '"Comic Sans MS", "Marker Felt", cursive' }}
-              >
-                {branch.label}
-              </h3>
-
-              {/* Cloud-shaped bubble */}
-              <div
-                className="relative p-5 pt-6"
-                style={{
-                  background: cloud.bg,
-                  border: `2px solid ${cloud.border}`,
-                  // wavy cloud border using border-radius mix
-                  borderRadius: '40% 50% 45% 55% / 55% 45% 50% 40%',
-                  boxShadow: '3px 4px 0 0 rgba(0,0,0,0.2)',
-                }}
-              >
-                <ul className="space-y-2">
-                  {branch.children.map((child, cIdx) => (
-                    <motion.li
-                      key={cIdx}
-                      initial={{ opacity: 0, x: 8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.1 + cIdx * 0.06 }}
-                      className="flex items-start gap-2 text-[13px] text-slate-900 leading-snug"
-                      style={{ fontFamily: '"Comic Sans MS", "Marker Felt", cursive' }}
-                    >
-                      <span className="text-slate-900 font-bold mt-0.5 shrink-0">•</span>
-                      <span>{child}</span>
-                    </motion.li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+              {branch.label}
+            </h3>
+            <p
+              className="text-slate-800 leading-snug overflow-hidden"
+              style={{
+                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
+                fontSize: 'clamp(8px, 1vw, 12px)',
+              }}
+            >
+              {branch.children.slice(0, 3).join(' • ')}
+            </p>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
