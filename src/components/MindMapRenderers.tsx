@@ -110,10 +110,10 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 12 }}
         className="absolute z-10 flex items-center justify-center text-center"
         style={{
-          top: '50.1%',
-          left: '49.5%',
+          top: '50%',
+          left: '49%',
           transform: 'translate(-50%, -50%)',
-          width: '26%',
+          width: '22%',
           height: '12%',
         }}
       >
@@ -121,7 +121,7 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
           className="font-black text-slate-900 leading-tight px-1"
           style={{
             fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
-            fontSize: 'clamp(11px, 1.6vw, 19px)',
+            fontSize: 'clamp(10px, 1.4vw, 17px)',
             fontWeight: 900,
           }}
         >
