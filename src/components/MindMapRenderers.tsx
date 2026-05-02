@@ -110,10 +110,10 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 12 }}
         className="absolute z-10 flex items-center justify-center text-center"
         style={{
-          top: '52%',
-          left: '50%',
+          top: '53%',
+          left: '47%',
           transform: 'translate(-50%, -50%)',
-          width: '20%',
+          width: '22%',
           height: '12%',
         }}
       >
