@@ -82,12 +82,12 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
 
   // Slots are CENTERS of each colored card (percent of 840x1188 frame)
   const slots = [
-    { cx: '48%', cy: '15%', w: '26%', h: '11%', titleColor: '#b91c1c' }, // pink top
-    { cx: '18%', cy: '30%', w: '26%', h: '11%', titleColor: '#15803d' }, // green left-upper
-    { cx: '78%', cy: '30%', w: '26%', h: '11%', titleColor: '#0369a1' }, // blue right-upper
-    { cx: '18%', cy: '69%', w: '26%', h: '11%', titleColor: '#9a3412' }, // orange left-lower
-    { cx: '78%', cy: '69%', w: '26%', h: '11%', titleColor: '#6d28d9' }, // purple right-lower
-    { cx: '48%', cy: '84%', w: '26%', h: '11%', titleColor: '#0f766e' }, // teal bottom
+    { cx: '49.6%', cy: '16.8%', w: '24%', h: '10%', titleColor: '#b91c1c' }, // pink top
+    { cx: '18.5%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#15803d' }, // green left-upper
+    { cx: '81.4%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#0369a1' }, // blue right-upper
+    { cx: '18.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#9a3412' }, // orange left-lower
+    { cx: '81.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#6d28d9' }, // purple right-lower
+    { cx: '49.6%', cy: '87.1%', w: '24%', h: '10%', titleColor: '#0f766e' }, // teal bottom
   ];
 
   return (
@@ -110,18 +110,19 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 12 }}
         className="absolute z-10 flex items-center justify-center text-center"
         style={{
-          top: '53%',
-          left: '47%',
+          top: '50.1%',
+          left: '49.5%',
           transform: 'translate(-50%, -50%)',
-          width: '22%',
+          width: '26%',
           height: '12%',
         }}
       >
         <p
           className="font-black text-slate-900 leading-tight px-1"
           style={{
-            fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-            fontSize: 'clamp(10px, 1.5vw, 18px)',
+            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+            fontSize: 'clamp(11px, 1.6vw, 19px)',
+            fontWeight: 900,
           }}
         >
           {data.title}
@@ -151,8 +152,9 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               className="font-black mb-0.5 leading-tight"
               style={{
                 color: slot.titleColor,
-                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-                fontSize: 'clamp(9px, 1.2vw, 14px)',
+                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                fontSize: 'clamp(9px, 1.25vw, 15px)',
+                fontWeight: 900,
               }}
             >
               {branch.label}
@@ -160,10 +162,11 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
             <p
               className="text-slate-800 leading-snug overflow-hidden"
               style={{
-                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
+                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
                 fontSize: 'clamp(7px, 0.9vw, 11px)',
+                fontWeight: 800,
                 display: '-webkit-box',
-                WebkitLineClamp: 3,
+                WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
               }}
             >
@@ -185,10 +188,10 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
 
   // Centers of each corner sticky-note strip in the 1536x1024 background
   const slots = [
-    { cx: '22%', cy: '15%', w: '26%', h: '14%' }, // top-left strip
-    { cx: '78%', cy: '15%', w: '26%', h: '14%' }, // top-right strip
-    { cx: '22%', cy: '78%', w: '26%', h: '14%' }, // bottom-left strip
-    { cx: '78%', cy: '78%', w: '26%', h: '14%' }, // bottom-right strip
+    { cx: '24.5%', cy: '14.8%', w: '24%', h: '10%' }, // top-left strip
+    { cx: '74.5%', cy: '15%', w: '24%', h: '10%' }, // top-right strip
+    { cx: '22.7%', cy: '76%', w: '23%', h: '11%' }, // bottom-left strip
+    { cx: '75.1%', cy: '76%', w: '24%', h: '11%' }, // bottom-right strip
   ];
 
   return (
@@ -211,18 +214,19 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120 }}
         className="absolute z-10 flex items-center justify-center text-center px-4"
         style={{
-          top: '50%',
-          left: '50%',
+          top: '48%',
+          left: '49%',
           transform: 'translate(-50%, -50%) rotate(-2deg)',
-          width: '24%',
-          height: '22%',
+          width: '28%',
+          height: '18%',
         }}
       >
         <p
           className="font-black text-slate-900 leading-tight"
           style={{
-            fontFamily: 'Georgia, serif',
+            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
             fontSize: 'clamp(12px, 1.8vw, 24px)',
+            fontWeight: 900,
           }}
         >
           {data.title}
@@ -250,8 +254,9 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
             <h3
               className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
               style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(9px, 1.1vw, 14px)',
+                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                fontSize: 'clamp(9px, 1.15vw, 15px)',
+                fontWeight: 900,
               }}
             >
               {branch.label}
@@ -259,8 +264,9 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
             <p
               className="text-slate-700 leading-snug overflow-hidden"
               style={{
-                fontFamily: 'Georgia, serif',
+                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
                 fontSize: 'clamp(7px, 0.9vw, 11px)',
+                fontWeight: 800,
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
