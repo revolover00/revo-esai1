@@ -82,12 +82,12 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
 
   // Slots are CENTERS of each colored card (percent of 840x1188 frame)
   const slots = [
-    { cx: '49.6%', cy: '16.8%', w: '24%', h: '10%', titleColor: '#b91c1c' }, // pink top
-    { cx: '18.5%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#15803d' }, // green left-upper
-    { cx: '81.4%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#0369a1' }, // blue right-upper
-    { cx: '18.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#9a3412' }, // orange left-lower
-    { cx: '81.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#6d28d9' }, // purple right-lower
-    { cx: '49.6%', cy: '87.1%', w: '24%', h: '10%', titleColor: '#0f766e' }, // teal bottom
+    { cx: '51%', cy: '16%', w: '32%', h: '14%', titleColor: '#b91c1c' }, // pink top
+    { cx: '21%', cy: '32%', w: '32%', h: '14%', titleColor: '#15803d' }, // green left-upper
+    { cx: '79%', cy: '32%', w: '32%', h: '14%', titleColor: '#0369a1' }, // blue right-upper
+    { cx: '21%', cy: '68%', w: '32%', h: '14%', titleColor: '#9a3412' }, // orange left-lower
+    { cx: '79%', cy: '68%', w: '32%', h: '14%', titleColor: '#6d28d9' }, // purple right-lower
+    { cx: '51%', cy: '84%', w: '32%', h: '14%', titleColor: '#0f766e' }, // teal bottom
   ];
 
   return (
