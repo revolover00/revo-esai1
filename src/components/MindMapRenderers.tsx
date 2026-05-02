@@ -188,10 +188,10 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
 
   // Centers of each corner sticky-note strip in the 1536x1024 background
   const slots = [
-    { cx: '22%', cy: '15%', w: '26%', h: '14%' }, // top-left strip
-    { cx: '78%', cy: '15%', w: '26%', h: '14%' }, // top-right strip
-    { cx: '22%', cy: '78%', w: '26%', h: '14%' }, // bottom-left strip
-    { cx: '78%', cy: '78%', w: '26%', h: '14%' }, // bottom-right strip
+    { cx: '24.5%', cy: '14.8%', w: '24%', h: '10%' }, // top-left strip
+    { cx: '74.5%', cy: '15%', w: '24%', h: '10%' }, // top-right strip
+    { cx: '22.7%', cy: '76%', w: '23%', h: '11%' }, // bottom-left strip
+    { cx: '75.1%', cy: '76%', w: '24%', h: '11%' }, // bottom-right strip
   ];
 
   return (
@@ -214,18 +214,19 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120 }}
         className="absolute z-10 flex items-center justify-center text-center px-4"
         style={{
-          top: '50%',
-          left: '50%',
+          top: '48%',
+          left: '49%',
           transform: 'translate(-50%, -50%) rotate(-2deg)',
-          width: '24%',
-          height: '22%',
+          width: '28%',
+          height: '18%',
         }}
       >
         <p
           className="font-black text-slate-900 leading-tight"
           style={{
-            fontFamily: 'Georgia, serif',
+            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
             fontSize: 'clamp(12px, 1.8vw, 24px)',
+            fontWeight: 900,
           }}
         >
           {data.title}
