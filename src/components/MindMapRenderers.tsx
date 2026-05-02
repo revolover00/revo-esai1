@@ -254,8 +254,9 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
             <h3
               className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
               style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(9px, 1.1vw, 14px)',
+                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                fontSize: 'clamp(9px, 1.15vw, 15px)',
+                fontWeight: 900,
               }}
             >
               {branch.label}
@@ -263,8 +264,9 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
             <p
               className="text-slate-700 leading-snug overflow-hidden"
               style={{
-                fontFamily: 'Georgia, serif',
+                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
                 fontSize: 'clamp(7px, 0.9vw, 11px)',
+                fontWeight: 800,
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
