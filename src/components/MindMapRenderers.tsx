@@ -152,8 +152,9 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               className="font-black mb-0.5 leading-tight"
               style={{
                 color: slot.titleColor,
-                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-                fontSize: 'clamp(9px, 1.2vw, 14px)',
+                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                fontSize: 'clamp(9px, 1.25vw, 15px)',
+                fontWeight: 900,
               }}
             >
               {branch.label}
@@ -161,10 +162,11 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
             <p
               className="text-slate-800 leading-snug overflow-hidden"
               style={{
-                fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
+                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
                 fontSize: 'clamp(7px, 0.9vw, 11px)',
+                fontWeight: 800,
                 display: '-webkit-box',
-                WebkitLineClamp: 3,
+                WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
               }}
             >
