@@ -82,12 +82,12 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
 
   // Slots are CENTERS of each colored card (percent of 840x1188 frame)
   const slots = [
-    { cx: '48%', cy: '15%', w: '26%', h: '11%', titleColor: '#b91c1c' }, // pink top
-    { cx: '18%', cy: '30%', w: '26%', h: '11%', titleColor: '#15803d' }, // green left-upper
-    { cx: '78%', cy: '30%', w: '26%', h: '11%', titleColor: '#0369a1' }, // blue right-upper
-    { cx: '18%', cy: '69%', w: '26%', h: '11%', titleColor: '#9a3412' }, // orange left-lower
-    { cx: '78%', cy: '69%', w: '26%', h: '11%', titleColor: '#6d28d9' }, // purple right-lower
-    { cx: '48%', cy: '84%', w: '26%', h: '11%', titleColor: '#0f766e' }, // teal bottom
+    { cx: '49.6%', cy: '16.8%', w: '24%', h: '10%', titleColor: '#b91c1c' }, // pink top
+    { cx: '18.5%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#15803d' }, // green left-upper
+    { cx: '81.4%', cy: '33.1%', w: '24%', h: '10%', titleColor: '#0369a1' }, // blue right-upper
+    { cx: '18.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#9a3412' }, // orange left-lower
+    { cx: '81.5%', cy: '69.9%', w: '24%', h: '10%', titleColor: '#6d28d9' }, // purple right-lower
+    { cx: '49.6%', cy: '87.1%', w: '24%', h: '10%', titleColor: '#0f766e' }, // teal bottom
   ];
 
   return (
@@ -110,18 +110,19 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 12 }}
         className="absolute z-10 flex items-center justify-center text-center"
         style={{
-          top: '53%',
-          left: '47%',
+          top: '50.1%',
+          left: '49.5%',
           transform: 'translate(-50%, -50%)',
-          width: '22%',
+          width: '26%',
           height: '12%',
         }}
       >
         <p
           className="font-black text-slate-900 leading-tight px-1"
           style={{
-            fontFamily: '"Comic Sans MS", "Marker Felt", cursive',
-            fontSize: 'clamp(10px, 1.5vw, 18px)',
+            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+            fontSize: 'clamp(11px, 1.6vw, 19px)',
+            fontWeight: 900,
           }}
         >
           {data.title}
