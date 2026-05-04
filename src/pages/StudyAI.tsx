@@ -46,7 +46,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable';
 import type { User } from '@supabase/supabase-js';
 import { AuthGate } from '@/components/AuthGate';
 import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
@@ -405,8 +404,14 @@ function StudyApp() {
   }, [user]);
 
   const handleGoogleSignIn = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-    if (result.error) console.error('Google sign-in error:', result.error);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+    if (error) console.error('Google sign-in error:', error);
   };
 
   const handleSignOut = async () => {
