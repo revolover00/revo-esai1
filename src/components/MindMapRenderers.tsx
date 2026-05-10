@@ -13,6 +13,22 @@ export interface MindMapData {
   branches: MindMapBranch[];
 }
 
+const solidDarkTextStyle = {
+  fontFamily: '"Noto Kufi Arabic", "Arial Black", "Noto Sans Arabic", Tahoma, sans-serif',
+  fontWeight: 900,
+  letterSpacing: 0,
+  WebkitTextStroke: '0.25px currentColor',
+  textShadow: '0 1px 0 rgba(255,255,255,0.45), 0 0 1px currentColor',
+};
+
+const solidLightTextStyle = {
+  fontFamily: '"Noto Kufi Arabic", "Arial Black", "Noto Sans Arabic", Tahoma, sans-serif',
+  fontWeight: 900,
+  letterSpacing: 0,
+  WebkitTextStroke: '0.3px currentColor',
+  textShadow: '1px 1px 0 rgba(15,23,42,0.55), 0 0 1px currentColor',
+};
+
 /* ============================================================
    Shared doodles for the Creative style (matches images_7)
    ============================================================ */
