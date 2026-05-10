@@ -5,6 +5,8 @@ export interface UsageState {
   freeUsesCount: number;
   freeRemaining: number;
   subscriptionExpiresAt: string | null;
+  subscriptionStartedAt: string | null;
+  activeCode: string | null;
   hasActiveSubscription: boolean;
   loading: boolean;
 }
