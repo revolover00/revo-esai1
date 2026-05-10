@@ -22,7 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   already_used: "هذا الكود تم استخدامه من قبل",
 };
 
-export function RedeemCodeDialog({ open, onOpenChange, onSuccess }: RedeemCodeDialogProps) {
+export function RedeemCodeDialog({ open, onOpenChange, onSuccess, subscriptionStartedAt, subscriptionExpiresAt, activeCode, freeRemaining }: RedeemCodeDialogProps) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
