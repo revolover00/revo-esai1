@@ -139,9 +139,8 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
           <p
             className="font-black text-slate-900 leading-tight px-1"
             style={{
-              fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+              ...solidDarkTextStyle,
               fontSize: 'clamp(10px, 1.4vw, 17px)',
-              fontWeight: 900,
             }}
           >
             {data.title}
@@ -174,10 +173,9 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               <h3
                 className="font-black mb-0.5 leading-tight"
                 style={{
+                  ...solidDarkTextStyle,
                   color: slot.titleColor,
-                  fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
                   fontSize: 'clamp(9px, 1.25vw, 15px)',
-                  fontWeight: 900,
                 }}
               >
                 {branch.label}
@@ -185,9 +183,8 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               <p
                 className="text-slate-800 leading-snug overflow-hidden"
                 style={{
-                  fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
+                  ...solidDarkTextStyle,
                   fontSize: 'clamp(7px, 0.9vw, 11px)',
-                  fontWeight: 800,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
