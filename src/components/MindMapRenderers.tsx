@@ -396,12 +396,12 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
                 }}
               >
                 <h3
-                  className="text-base font-black mb-2 italic"
-                  style={{ color: style.titleColor, fontFamily: '"Comic Sans MS", cursive' }}
+                  className="text-base font-black mb-2"
+                  style={{ ...solidDarkTextStyle, color: style.titleColor, fontSize: '1rem' }}
                 >
                   {branch.label}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed">
+                <p className="text-xs text-slate-800 leading-relaxed" style={solidDarkTextStyle}>
                   {branch.children.join('، ')}
                 </p>
               </div>
@@ -444,7 +444,7 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
           <div className="absolute inset-0 flex items-center justify-center text-center px-12">
             <p
               className="text-white font-black text-lg leading-tight"
-              style={{ fontFamily: '"Comic Sans MS", cursive', textShadow: '1px 1px 0 rgba(0,0,0,0.3)' }}
+              style={solidLightTextStyle}
             >
               {data.title}
             </p>
@@ -474,12 +474,12 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
                 }}
               >
                 <h3
-                  className="text-base font-black mb-2 italic"
-                  style={{ color: style.titleColor, fontFamily: '"Comic Sans MS", cursive' }}
+                  className="text-base font-black mb-2"
+                  style={{ ...solidDarkTextStyle, color: style.titleColor, fontSize: '1rem' }}
                 >
                   {branch.label}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed">
+                <p className="text-xs text-slate-800 leading-relaxed" style={solidDarkTextStyle}>
                   {branch.children.join('، ')}
                 </p>
               </div>
