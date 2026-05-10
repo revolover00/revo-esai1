@@ -216,11 +216,8 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
       />
 
       {/* Central title on the paper-clipped card */}
-      <motion.div
-        initial={{ scale: 0, rotate: -8 }}
-        animate={{ scale: 1, rotate: -2 }}
-        transition={{ type: 'spring', stiffness: 120 }}
-        className="absolute z-10 flex items-center justify-center text-center px-4"
+      <div
+        className="absolute z-10"
         style={{
           top: '48%',
           left: '49%',
@@ -229,28 +226,32 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
           height: '18%',
         }}
       >
-        <p
-          className="font-black text-slate-900 leading-tight"
-          style={{
-            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
-            fontSize: 'clamp(12px, 1.8vw, 24px)',
-            fontWeight: 900,
-          }}
+        <motion.div
+          initial={{ scale: 0, rotate: -8 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 120 }}
+          className="flex h-full w-full items-center justify-center text-center px-4"
         >
-          {data.title}
-        </p>
-      </motion.div>
+          <p
+            className="font-black text-slate-900 leading-tight"
+            style={{
+              fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+              fontSize: 'clamp(12px, 1.8vw, 24px)',
+              fontWeight: 900,
+            }}
+          >
+            {data.title}
+          </p>
+        </motion.div>
+      </div>
 
       {/* Branch content placed on each corner sticky note */}
       {branches.map((branch, idx) => {
         const slot = slots[idx];
         return (
-          <motion.div
+          <div
             key={idx}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1, type: 'spring' }}
-            className="absolute z-10 flex flex-col items-center justify-center text-center px-2"
+            className="absolute z-10"
             style={{
               top: slot.cy,
               left: slot.cx,
@@ -259,30 +260,37 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
               height: slot.h,
             }}
           >
-            <h3
-              className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
-              style={{
-                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
-                fontSize: 'clamp(9px, 1.15vw, 15px)',
-                fontWeight: 900,
-              }}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1, type: 'spring' }}
+              className="flex h-full w-full flex-col items-center justify-center text-center px-2"
             >
-              {branch.label}
-            </h3>
-            <p
-              className="text-slate-700 leading-snug overflow-hidden"
-              style={{
-                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
-                fontSize: 'clamp(7px, 0.9vw, 11px)',
-                fontWeight: 800,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-              }}
-            >
-              {branch.children.slice(0, 2).join(' • ')}
-            </p>
-          </motion.div>
+              <h3
+                className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
+                style={{
+                  fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                  fontSize: 'clamp(9px, 1.15vw, 15px)',
+                  fontWeight: 900,
+                }}
+              >
+                {branch.label}
+              </h3>
+              <p
+                className="text-slate-700 leading-snug overflow-hidden"
+                style={{
+                  fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
+                  fontSize: 'clamp(7px, 0.9vw, 11px)',
+                  fontWeight: 800,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {branch.children.slice(0, 2).join(' • ')}
+              </p>
+            </motion.div>
+          </div>
         );
       })}
     </div>
