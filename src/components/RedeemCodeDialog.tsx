@@ -10,6 +10,10 @@ interface RedeemCodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  subscriptionStartedAt?: string | null;
+  subscriptionExpiresAt?: string | null;
+  activeCode?: string | null;
+  freeRemaining?: number;
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
