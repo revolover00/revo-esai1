@@ -101,6 +101,7 @@ export type Database = {
           created_at: string
           free_uses_count: number
           subscription_expires_at: string | null
+          subscription_started_at: string | null
           updated_at: string
           user_id: string
         }
@@ -109,6 +110,7 @@ export type Database = {
           created_at?: string
           free_uses_count?: number
           subscription_expires_at?: string | null
+          subscription_started_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -117,6 +119,7 @@ export type Database = {
           created_at?: string
           free_uses_count?: number
           subscription_expires_at?: string | null
+          subscription_started_at?: string | null
           updated_at?: string
           user_id?: string
         }
