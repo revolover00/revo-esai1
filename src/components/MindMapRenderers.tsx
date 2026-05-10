@@ -104,11 +104,8 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
       />
 
       {/* Central title inside the pink burst */}
-      <motion.div
-        initial={{ scale: 0, rotate: -10 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 12 }}
-        className="absolute z-10 flex items-center justify-center text-center"
+      <div
+        className="absolute z-10"
         style={{
           top: '50%',
           left: '49%',
@@ -117,29 +114,33 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
           height: '12%',
         }}
       >
-        <p
-          className="font-black text-slate-900 leading-tight px-1"
-          style={{
-            fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
-            fontSize: 'clamp(10px, 1.4vw, 17px)',
-            fontWeight: 900,
-          }}
+        <motion.div
+          initial={{ scale: 0, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 120, damping: 12 }}
+          className="flex h-full w-full items-center justify-center text-center"
         >
-          {data.title}
-        </p>
-      </motion.div>
+          <p
+            className="font-black text-slate-900 leading-tight px-1"
+            style={{
+              fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+              fontSize: 'clamp(10px, 1.4vw, 17px)',
+              fontWeight: 900,
+            }}
+          >
+            {data.title}
+          </p>
+        </motion.div>
+      </div>
 
       {/* Branch content laid over each colored box */}
       {branches.map((branch, idx) => {
         const slot = slots[idx];
         if (!slot) return null;
         return (
-          <motion.div
+          <div
             key={idx}
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.1, type: 'spring' }}
-            className="absolute z-10 flex flex-col items-center justify-center text-center px-2"
+            className="absolute z-10"
             style={{
               top: slot.cy,
               left: slot.cx,
@@ -148,31 +149,38 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               height: slot.h,
             }}
           >
-            <h3
-              className="font-black mb-0.5 leading-tight"
-              style={{
-                color: slot.titleColor,
-                fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
-                fontSize: 'clamp(9px, 1.25vw, 15px)',
-                fontWeight: 900,
-              }}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.1, type: 'spring' }}
+              className="flex h-full w-full flex-col items-center justify-center text-center px-2"
             >
-              {branch.label}
-            </h3>
-            <p
-              className="text-slate-800 leading-snug overflow-hidden"
-              style={{
-                fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
-                fontSize: 'clamp(7px, 0.9vw, 11px)',
-                fontWeight: 800,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-              }}
-            >
-              {branch.children.slice(0, 3).join(' • ')}
-            </p>
-          </motion.div>
+              <h3
+                className="font-black mb-0.5 leading-tight"
+                style={{
+                  color: slot.titleColor,
+                  fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                  fontSize: 'clamp(9px, 1.25vw, 15px)',
+                  fontWeight: 900,
+                }}
+              >
+                {branch.label}
+              </h3>
+              <p
+                className="text-slate-800 leading-snug overflow-hidden"
+                style={{
+                  fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
+                  fontSize: 'clamp(7px, 0.9vw, 11px)',
+                  fontWeight: 800,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {branch.children.slice(0, 3).join(' • ')}
+              </p>
+            </motion.div>
+          </div>
         );
       })}
     </div>
