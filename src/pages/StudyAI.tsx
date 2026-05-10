@@ -1458,7 +1458,15 @@ function StudyApp() {
           <AIChatAssistant onClose={() => setShowChatAssistant(false)} />
         )}
       </AnimatePresence>
-      <RedeemCodeDialog open={showRedeemDialog} onOpenChange={setShowRedeemDialog} onSuccess={usage.refresh} />
+      <RedeemCodeDialog
+        open={showRedeemDialog}
+        onOpenChange={setShowRedeemDialog}
+        onSuccess={usage.refresh}
+        subscriptionStartedAt={usage.subscriptionStartedAt}
+        subscriptionExpiresAt={usage.subscriptionExpiresAt}
+        activeCode={usage.activeCode}
+        freeRemaining={usage.freeRemaining}
+      />
       <MindMapStylePicker
         open={showStylePicker}
         onClose={() => setShowStylePicker(false)}
