@@ -13,6 +13,22 @@ export interface MindMapData {
   branches: MindMapBranch[];
 }
 
+const solidDarkTextStyle = {
+  fontFamily: '"Noto Kufi Arabic", "Arial Black", "Noto Sans Arabic", Tahoma, sans-serif',
+  fontWeight: 900,
+  letterSpacing: 0,
+  WebkitTextStroke: '0.25px currentColor',
+  textShadow: '0 1px 0 rgba(255,255,255,0.45), 0 0 1px currentColor',
+};
+
+const solidLightTextStyle = {
+  fontFamily: '"Noto Kufi Arabic", "Arial Black", "Noto Sans Arabic", Tahoma, sans-serif',
+  fontWeight: 900,
+  letterSpacing: 0,
+  WebkitTextStroke: '0.3px currentColor',
+  textShadow: '1px 1px 0 rgba(15,23,42,0.55), 0 0 1px currentColor',
+};
+
 /* ============================================================
    Shared doodles for the Creative style (matches images_7)
    ============================================================ */
@@ -123,9 +139,8 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
           <p
             className="font-black text-slate-900 leading-tight px-1"
             style={{
-              fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+              ...solidDarkTextStyle,
               fontSize: 'clamp(10px, 1.4vw, 17px)',
-              fontWeight: 900,
             }}
           >
             {data.title}
@@ -158,10 +173,9 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               <h3
                 className="font-black mb-0.5 leading-tight"
                 style={{
+                  ...solidDarkTextStyle,
                   color: slot.titleColor,
-                  fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
                   fontSize: 'clamp(9px, 1.25vw, 15px)',
-                  fontWeight: 900,
                 }}
               >
                 {branch.label}
@@ -169,9 +183,8 @@ export function CreativeMindMap({ data }: { data: MindMapData }) {
               <p
                 className="text-slate-800 leading-snug overflow-hidden"
                 style={{
-                  fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
+                  ...solidDarkTextStyle,
                   fontSize: 'clamp(7px, 0.9vw, 11px)',
-                  fontWeight: 800,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -235,9 +248,8 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
           <p
             className="font-black text-slate-900 leading-tight"
             style={{
-              fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+              ...solidDarkTextStyle,
               fontSize: 'clamp(12px, 1.8vw, 24px)',
-              fontWeight: 900,
             }}
           >
             {data.title}
@@ -269,9 +281,8 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
               <h3
                 className="font-black text-slate-900 mb-0.5 uppercase tracking-wide leading-tight"
                 style={{
-                  fontFamily: '"Arial Black", "Noto Sans Arabic", sans-serif',
+                  ...solidDarkTextStyle,
                   fontSize: 'clamp(9px, 1.15vw, 15px)',
-                  fontWeight: 900,
                 }}
               >
                 {branch.label}
@@ -279,9 +290,8 @@ export function NotesMindMap({ data }: { data: MindMapData }) {
               <p
                 className="text-slate-700 leading-snug overflow-hidden"
                 style={{
-                  fontFamily: '"Noto Sans Arabic", Inter, sans-serif',
+                  ...solidDarkTextStyle,
                   fontSize: 'clamp(7px, 0.9vw, 11px)',
-                  fontWeight: 800,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -386,12 +396,12 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
                 }}
               >
                 <h3
-                  className="text-base font-black mb-2 italic"
-                  style={{ color: style.titleColor, fontFamily: '"Comic Sans MS", cursive' }}
+                  className="text-base font-black mb-2"
+                  style={{ ...solidDarkTextStyle, color: style.titleColor, fontSize: '1rem' }}
                 >
                   {branch.label}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed">
+                <p className="text-xs text-slate-800 leading-relaxed" style={solidDarkTextStyle}>
                   {branch.children.join('، ')}
                 </p>
               </div>
@@ -434,7 +444,7 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
           <div className="absolute inset-0 flex items-center justify-center text-center px-12">
             <p
               className="text-white font-black text-lg leading-tight"
-              style={{ fontFamily: '"Comic Sans MS", cursive', textShadow: '1px 1px 0 rgba(0,0,0,0.3)' }}
+              style={solidLightTextStyle}
             >
               {data.title}
             </p>
@@ -464,12 +474,12 @@ export function BusinessMindMap({ data }: { data: MindMapData }) {
                 }}
               >
                 <h3
-                  className="text-base font-black mb-2 italic"
-                  style={{ color: style.titleColor, fontFamily: '"Comic Sans MS", cursive' }}
+                  className="text-base font-black mb-2"
+                  style={{ ...solidDarkTextStyle, color: style.titleColor, fontSize: '1rem' }}
                 >
                   {branch.label}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed">
+                <p className="text-xs text-slate-800 leading-relaxed" style={solidDarkTextStyle}>
                   {branch.children.join('، ')}
                 </p>
               </div>
