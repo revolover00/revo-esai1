@@ -1506,7 +1506,7 @@ function StudyApp() {
               )}
             </button>
             <button
-              onClick={() => setShowChatAssistant(true)}
+              onClick={() => navigate('/teacher')}
               className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 transition-all shadow-md shadow-amber-500/40 ring-1 ring-amber-600/40 hover:scale-105"
               title="Revo Teacher - دردشة دراسية بدون ملفات"
             >
@@ -1671,7 +1671,7 @@ function StudyApp() {
 
                   {/* Open AI Chat Assistant (no upload needed) — gold */}
                   <button
-                    onClick={() => setShowChatAssistant(true)}
+                    onClick={() => navigate('/teacher')}
                     className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 flex items-center justify-center gap-3 bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 ring-1 ring-amber-600/40 relative overflow-hidden group"
                   >
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
