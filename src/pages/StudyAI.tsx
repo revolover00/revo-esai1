@@ -177,7 +177,7 @@ function StudyApp() {
   // Mind map style state — user picks a visual style before generating
   const [mindMapStyle, setMindMapStyle] = useState<MindMapStyle>('modern');
   const [showStylePicker, setShowStylePicker] = useState(false);
-  const [showChatAssistant, setShowChatAssistant] = useState(false);
+  
   const responseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
