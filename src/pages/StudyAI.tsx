@@ -404,9 +404,10 @@ function StudyApp() {
     })();
   }, [user]);
 
-  const handleGoogleSignIn = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-    if (result.error) console.error('Google sign-in error:', result.error);
+  const navigate = useNavigate();
+
+  const handleGoogleSignIn = () => {
+    navigate('/login');
   };
 
   const handleSignOut = async () => {
