@@ -53,7 +53,7 @@ import { RedeemCodeDialog } from '@/components/RedeemCodeDialog';
 import { useUsage } from '@/hooks/useUsage';
 import { MindMapStylePicker, type MindMapStyle } from '@/components/MindMapStylePicker';
 import { CreativeMindMap, NotesMindMap, BusinessMindMap } from '@/components/MindMapRenderers';
-import { AIChatAssistant } from '@/components/AIChatAssistant';
+import { useNavigate } from 'react-router-dom';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -177,7 +177,7 @@ function StudyApp() {
   // Mind map style state — user picks a visual style before generating
   const [mindMapStyle, setMindMapStyle] = useState<MindMapStyle>('modern');
   const [showStylePicker, setShowStylePicker] = useState(false);
-  const [showChatAssistant, setShowChatAssistant] = useState(false);
+  
   const responseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -404,9 +404,10 @@ function StudyApp() {
     })();
   }, [user]);
 
-  const handleGoogleSignIn = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-    if (result.error) console.error('Google sign-in error:', result.error);
+  const navigate = useNavigate();
+
+  const handleGoogleSignIn = () => {
+    navigate('/login');
   };
 
   const handleSignOut = async () => {
@@ -1453,11 +1454,8 @@ function StudyApp() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020617] text-right transition-colors" dir="rtl">
-      <AnimatePresence>
-        {showChatAssistant && (
-          <AIChatAssistant onClose={() => setShowChatAssistant(false)} />
-        )}
-      </AnimatePresence>
+      <AnimatePresence />
+
       <RedeemCodeDialog
         open={showRedeemDialog}
         onOpenChange={setShowRedeemDialog}
@@ -1508,7 +1506,7 @@ function StudyApp() {
               )}
             </button>
             <button
-              onClick={() => setShowChatAssistant(true)}
+              onClick={() => navigate('/teacher')}
               className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 transition-all shadow-md shadow-amber-500/40 ring-1 ring-amber-600/40 hover:scale-105"
               title="Revo Teacher - دردشة دراسية بدون ملفات"
             >
@@ -1673,7 +1671,7 @@ function StudyApp() {
 
                   {/* Open AI Chat Assistant (no upload needed) — gold */}
                   <button
-                    onClick={() => setShowChatAssistant(true)}
+                    onClick={() => navigate('/teacher')}
                     className="w-full px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 flex items-center justify-center gap-3 bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 ring-1 ring-amber-600/40 relative overflow-hidden group"
                   >
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
