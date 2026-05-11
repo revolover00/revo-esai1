@@ -148,6 +148,14 @@ export function RedeemCodeDialog({ open, onOpenChange, onSuccess, subscriptionSt
             onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
           />
         </div>
+        <a
+          href="https://wa.me/201224637165"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-sm font-semibold text-emerald-700 hover:bg-emerald-500/20 transition dark:text-emerald-300"
+        >
+          للاشتراك أو الحصول على كود، تواصل مع المطور على واتساب: 01224637165
+        </a>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             إغلاق
