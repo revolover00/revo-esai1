@@ -1,0 +1,9 @@
+# Revo ESAI
+
+> AI-powered study assistant for Arabic-speaking students: lesson summaries, mind maps, voice transcription, and a smart Q&A teacher.
+
+## Pages
+
+- [Home](/): Overview of Revo ESAI study tools and AI assistant.
+- [Login](/login): Sign in with Google to access AI usage and activation codes.
+- [Revo Teacher](/teacher): Conversational AI teacher to ask questions and get explanations.
