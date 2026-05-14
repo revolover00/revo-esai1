@@ -4,6 +4,7 @@ import { LogIn, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -40,6 +41,16 @@ export default function LoginPage() {
   }
 
   return (
+    <>
+    <Helmet>
+      <title>Sign In — Revo ESAI AI Study Assistant</title>
+      <meta name="description" content="Sign in to Revo ESAI with Google to unlock AI-powered study tools, lesson summaries, mind maps, and unlimited usage with an activation code." />
+      <link rel="canonical" href="https://revo-esai.lovable.app/login" />
+      <meta property="og:title" content="Sign In — Revo ESAI" />
+      <meta property="og:description" content="Sign in with Google to access Revo ESAI's AI study tools." />
+      <meta property="og:url" content="https://revo-esai.lovable.app/login" />
+      <meta property="og:type" content="website" />
+    </Helmet>
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted" dir="rtl">
       <Card className="max-w-md w-full p-8 text-center space-y-6">
         <div className="flex justify-center">
@@ -67,5 +78,6 @@ export default function LoginPage() {
         </button>
       </Card>
     </div>
+    </>
   );
 }
