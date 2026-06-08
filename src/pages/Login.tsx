@@ -45,10 +45,10 @@ export default function LoginPage() {
     <Helmet>
       <title>Sign In — Revo ESAI AI Study Assistant</title>
       <meta name="description" content="Sign in to Revo ESAI with Google to unlock AI-powered study tools, lesson summaries, mind maps, and unlimited usage with an activation code." />
-      <link rel="canonical" href="https://revo-esai.lovable.app/login" />
+      <link rel="canonical" href="https://revo-esai.vercel.app/login" />
       <meta property="og:title" content="Sign In — Revo ESAI" />
       <meta property="og:description" content="Sign in with Google to access Revo ESAI's AI study tools." />
-      <meta property="og:url" content="https://revo-esai.lovable.app/login" />
+      <meta property="og:url" content="https://revo-esai.vercel.app/login" />
       <meta property="og:type" content="website" />
     </Helmet>
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted" dir="rtl">
