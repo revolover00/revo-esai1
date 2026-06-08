@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://revo-esai.lovable.app/sitemap.xml
+Sitemap: https://revo-esai.vercel.app/sitemap.xml

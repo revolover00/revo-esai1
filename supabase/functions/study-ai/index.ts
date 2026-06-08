@@ -320,7 +320,7 @@ async function callOpenRouterWithKey(apiKey: string, messages: any[]) {
       "Content-Type": "application/json",
       // Light obfuscation so the keys don't all fingerprint as one app
       "User-Agent": pickRandom(FAKE_USER_AGENTS),
-      "HTTP-Referer": "https://revo-ai-buddy.lovable.app",
+      "HTTP-Referer": "https://revo-esai.vercel.app",
       "X-Title": "Revo Teacher",
     },
     body: JSON.stringify({
