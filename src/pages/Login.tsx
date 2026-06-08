@@ -26,10 +26,24 @@ export default function LoginPage() {
   }, [navigate, redirect]);
 
   const handleGoogleSignIn = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/login",
+    const host = window.location.hostname;
+    const isLovableHost = host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com") || host === "localhost";
+
+    // Lovable's managed OAuth broker (/~oauth/*) only works on Lovable-hosted domains.
+    // On Vercel / custom hosts, fall back to Supabase's native OAuth flow.
+    if (isLovableHost) {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin + "/login",
+      });
+      if (result.error) console.error("Google sign-in error:", result.error);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/login" },
     });
-    if (result.error) console.error("Google sign-in error:", result.error);
+    if (error) console.error("Google sign-in error:", error);
   };
 
   if (checking) {
